@@ -26,9 +26,9 @@ def main():
     parser.add_argument("url", help="Target URL to scan")
     
     # Optional arguments
-    parser.add_argument("-o", "--output", help="Output directory (default: ./downloads)", default="downloads")
-    parser.add_argument("-r", "--reports", help="Reports directory (default: ./reports)", default="reports")
-    parser.add_argument("-a", "--all-domains", help="Scan all linked domains, not just the target domain", action="store_true")
+    parser.add_argument("-d", "--downloads", help="Base directory for downloads (default: ./targets)", default="targets")
+    parser.add_argument("-r", "--reports", help="Base directory for reports (default: ./targets)", default="targets")
+    parser.add_argument("-a", "--all-domains", help="Scan all linked domains with specified depth (default: unlimited depth)", type=int, nargs='?', const=None)
     parser.add_argument("-m", "--media", help="Download media files (images, videos, etc.)", action="store_true")
     parser.add_argument("-z", "--archives", help="Download archive files (zip, tar, etc.)", action="store_true")
     parser.add_argument("-t", "--text", help="Download text files (txt, md, etc.)", action="store_true")
@@ -48,16 +48,17 @@ def main():
         logging.basicConfig(level=logging.INFO)
     
     # Create output directories if they don't exist
-    os.makedirs(args.output, exist_ok=True)
+    os.makedirs(args.downloads, exist_ok=True)
     os.makedirs(args.reports, exist_ok=True)
     
     try:
         # Create scanner instance
         scanner = WebScanner(
             target_url=args.url,
-            download_dir=args.output,
+            download_dir=args.downloads,
             report_dir=args.reports,
-            same_domain_only=not args.all_domains,
+            same_domain_only=args.all_domains is None,
+            max_depth=args.all_domains,
             download_media=args.media,
             download_archives=args.archives,
             download_text=args.text,
@@ -69,8 +70,9 @@ def main():
         scanner.start_scan()
         
         print(f"\nScan completed successfully!")
-        print(f"Downloaded files: {args.output}")
-        print(f"Reports: {args.reports}")
+        print(f"Results stored in: {scanner.target_dir}")
+        print(f"├── Downloaded files: {scanner.download_dir}")
+        print(f"└── Reports: {scanner.report_dir}")
         
     except KeyboardInterrupt:
         print("\nScan interrupted by user.")

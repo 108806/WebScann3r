@@ -56,7 +56,7 @@ Basic usage:
 ### Options
 
 ```
-usage: webscann3r.py [-h] [-o OUTPUT] [-r REPORTS] [-a] [-m] [-z] [-t]
+usage: webscann3r.py [-h] [-d DOWNLOADS] [-r REPORTS] [-a] [-m] [-z] [-t]
                      [-j THREADS] [--timeout TIMEOUT] [-v] [-q]
                      url
 
@@ -65,13 +65,14 @@ WebScann3r - A Web Scanning and Mapping Tool for Red Teams
 positional arguments:
   url                   Target URL to scan
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -o OUTPUT, --output OUTPUT
-                        Output directory (default: ./downloads)
+  -d DOWNLOADS, --downloads DOWNLOADS
+                        Base directory for downloads (default: ./targets)
   -r REPORTS, --reports REPORTS
-                        Reports directory (default: ./reports)
-  -a, --all-domains     Scan all linked domains, not just the target domain
+                        Base directory for reports (default: ./targets)
+  -a [DEPTH], --all-domains [DEPTH]
+                        Scan all linked domains with specified depth (default: unlimited depth)
   -m, --media           Download media files (images, videos, etc.)
   -z, --archives        Download archive files (zip, tar, etc.)
   -t, --text            Download text files (txt, md, etc.)
@@ -104,19 +105,24 @@ optional arguments:
    ./webscann3r.py https://example.com -a
    ```
 
-5. Complete scan with all file types:
+5. Scan all linked domains with depth limit of 1 (only direct links):
+   ```bash
+   ./webscann3r.py https://example.com -a 1
+   ```
+
+6. Complete scan with all file types:
    ```bash
    ./webscann3r.py https://example.com -a -m -z -t
    ```
 
-6. Verbose output for debugging:
+7. Verbose output for debugging:
    ```bash
    ./webscann3r.py https://example.com -v
    ```
 
 ## Reports
 
-After scanning, WebScann3r generates several reports in the specified reports directory:
+After scanning, WebScann3r generates several reports in the target-specific reports directory:
 
 1. **security_report.md**: Details all potential security issues found in the code
 2. **function_usage_report.md**: Shows how many times each function is called
@@ -125,7 +131,22 @@ After scanning, WebScann3r generates several reports in the specified reports di
 5. **discovered_endpoints.json**: A JSON file listing all detected API endpoints and routes
 6. **discovered_versions.json**: A JSON file containing all detected software versions and technology stack information
 
-The reports are organized by target site in a structure like `targets/sitename/reports/`.
+The reports are organized by target site with timestamps in a structure like:
+```
+targets/
+└── example.com_20250515_120000/
+    ├── downloads/
+    │   └── (downloaded files)
+    └── reports/
+        ├── final_report.md
+        ├── security_report.md
+        ├── function_usage_report.md
+        ├── discovered_files_dirs.json
+        ├── discovered_endpoints.json
+        └── discovered_versions.json
+```
+
+This structure ensures each scan is isolated and timestamped for better organization.
 
 ## Recommendations for Use
 

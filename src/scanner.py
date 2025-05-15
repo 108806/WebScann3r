@@ -11,22 +11,43 @@ import json
 import time
 from pathlib import Path
 from collections import Counter
+from colorama import Fore, Style, init
 
-# Configure logging
+# Initialize colorama
+init(autoreset=True)
+
+# Custom color formatter for logging
+class ColorFormatter(logging.Formatter):
+    FORMATS = {
+        logging.DEBUG: Fore.WHITE + "%(asctime)s - %(name)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
+        logging.INFO: Fore.GREEN + "%(asctime)s - %(name)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
+        logging.WARNING: Fore.YELLOW + "%(asctime)s - %(name)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
+        logging.ERROR: Fore.RED + "%(asctime)s - %(name)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
+        logging.CRITICAL: Fore.RED + Style.BRIGHT + "%(asctime)s - %(name)s - %(levelname)s - %(message)s" + Style.RESET_ALL
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+# Configure logging with colors
+handler = logging.StreamHandler()
+handler.setFormatter(ColorFormatter())
+file_handler = logging.FileHandler("webscann3r.log")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("webscann3r.log"),
-        logging.StreamHandler()
-    ]
+    handlers=[file_handler, handler]
 )
 
 logger = logging.getLogger('WebScann3r')
 
 class WebScanner:
     def __init__(self, target_url, download_dir='targets', report_dir='targets', same_domain_only=True, 
-                 download_media=False, download_archives=False, download_text=False, threads=10, timeout=30):
+                 download_media=False, download_archives=False, download_text=False, threads=10, timeout=30,
+                 max_depth=None):
         """
         Initialize the web scanner
         
@@ -40,22 +61,26 @@ class WebScanner:
             download_text (bool): Whether to download text files
             threads (int): Number of threads for concurrent requests
             timeout (int): Request timeout in seconds
+            max_depth (int): Maximum depth to crawl (None for no limit)
         """
         self.target_url = target_url
         self.base_domain = urlparse(target_url).netloc
         self.same_domain_only = same_domain_only
+        self.max_depth = max_depth
         self.download_media = download_media
         self.download_archives = download_archives
         self.download_text = download_text
         self.threads = threads
         self.timeout = timeout
         
-        # Create site-specific directories
-        site_dir = self.base_domain.replace(':', '_')
+        # Create site-specific directories with timestamp
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        site_dir = f"{self.base_domain.replace(':', '_')}_{timestamp}"
         
-        # Directories setup
-        self.download_dir = os.path.abspath(os.path.join(download_dir, site_dir, 'downloads'))
-        self.report_dir = os.path.abspath(os.path.join(report_dir, site_dir, 'reports'))
+        # Directories setup - everything under targets/sitename_timestamp/
+        self.target_dir = os.path.abspath(os.path.join(download_dir, site_dir))
+        self.download_dir = os.path.abspath(os.path.join(self.target_dir, 'downloads'))
+        self.report_dir = os.path.abspath(os.path.join(self.target_dir, 'reports'))
         
         # Create directories if they don't exist
         os.makedirs(self.download_dir, exist_ok=True)
@@ -108,12 +133,17 @@ class WebScanner:
         """
         logger.info(f"Starting scan on {self.target_url}")
         logger.info(f"Domain scope: {'Same domain only' if self.same_domain_only else 'All domains'}")
+        if self.max_depth is not None:
+            logger.info(f"Depth limit: {self.max_depth}")
         logger.info(f"Download settings - Media: {self.download_media}, Archives: {self.download_archives}, Text: {self.download_text}")
         
         start_time = time.time()
         
-        # Queue of URLs to scan
-        urls_to_scan = [self.target_url]
+        # Queue of URLs to scan with their depth
+        urls_to_scan = [(self.target_url, 0)]  # (url, depth)
+        
+        # Track URL depths
+        self.url_depths = {self.target_url: 0}
         
         # Start scanning
         while urls_to_scan:
@@ -123,16 +153,21 @@ class WebScanner:
                 urls_to_scan = urls_to_scan[100:]
                 
                 # Process URLs in parallel
-                future_to_url = {executor.submit(self.process_url, url): url for url in current_batch}
+                future_to_url = {executor.submit(self.process_url, url, depth): (url, depth) for url, depth in current_batch}
                 
                 for future in future_to_url:
-                    url = future_to_url[future]
+                    url, current_depth = future_to_url[future]
                     try:
                         new_urls = future.result()
                         # Add new discovered URLs to the queue if they haven't been visited
-                        for new_url in new_urls:
-                            if new_url not in self.visited_urls:
-                                urls_to_scan.append(new_url)
+                        next_depth = current_depth + 1
+                        
+                        # Only add URLs if we haven't reached the max depth
+                        if self.max_depth is None or next_depth <= self.max_depth:
+                            for new_url in new_urls:
+                                if new_url not in self.visited_urls and (new_url not in self.url_depths or next_depth < self.url_depths[new_url]):
+                                    self.url_depths[new_url] = next_depth
+                                    urls_to_scan.append((new_url, next_depth))
                     except Exception as exc:
                         logger.error(f"Error processing {url}: {exc}")
         
@@ -147,12 +182,13 @@ class WebScanner:
         # Generate final report
         self.generate_final_report()
     
-    def process_url(self, url):
+    def process_url(self, url, depth=0):
         """
         Process a single URL
         
         Args:
             url (str): URL to process
+            depth (int): Current depth of the URL
             
         Returns:
             list: List of new discovered URLs
@@ -161,77 +197,89 @@ class WebScanner:
             return []
         
         self.visited_urls.add(url)
-        logger.info(f"Processing: {url}")
+        logger.info(f"Processing: {url} (depth: {depth})")
         
-        try:
-            response = requests.get(url, headers=self.headers, timeout=self.timeout, allow_redirects=True)
-            
-            # Check for API endpoints
-            url_path = urlparse(url).path.lower()
-            if (('/api/' in url_path) or 
-                ('/service/' in url_path) or 
-                ('/services/' in url_path) or 
-                ('/v1/' in url_path) or 
-                ('/v2/' in url_path) or 
-                ('/v3/' in url_path) or 
-                ('/graphql' in url_path) or 
-                ('/rest/' in url_path) or 
-                url_path.endswith('.json') or 
-                url_path.endswith('.xml')
-               ):
-                self.api_endpoints.add(url)
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                response = requests.get(url, headers=self.headers, timeout=self.timeout, allow_redirects=True)
+                
+                # Check for API endpoints
+                url_path = urlparse(url).path.lower()
+                if (('/api/' in url_path) or 
+                    ('/service/' in url_path) or 
+                    ('/services/' in url_path) or 
+                    ('/v1/' in url_path) or 
+                    ('/v2/' in url_path) or 
+                    ('/v3/' in url_path) or 
+                    ('/graphql' in url_path) or 
+                    ('/rest/' in url_path) or 
+                    url_path.endswith('.json') or 
+                    url_path.endswith('.xml')
+                ):
+                    self.api_endpoints.add(url)
 
-            # Extract version information from headers
-            self.extract_versions_from_headers(response.headers)
-            
-            if response.status_code != 200:
-                logger.warning(f"Received status code {response.status_code} for {url}")
+                # Extract version information from headers
+                self.extract_versions_from_headers(response.headers)
+                
+                if response.status_code != 200:
+                    logger.warning(f"Received status code {response.status_code} for {url}")
+                    return []
+                
+                # Parse the URL
+                parsed_url = urlparse(url)
+                
+                # Check if we should download this file
+                content_type = response.headers.get('Content-Type', '').lower()
+                file_path = self.get_file_path(url)
+                
+                # Handle based on content type and extension
+                if any(ext in file_path.lower() for ext in self.code_extensions):
+                    # Handle code files
+                    self.save_and_store_code(url, response.text, file_path)
+                    # Extract URLs from code files as well
+                    return self.extract_urls(url, response.text)
+                
+                elif 'text/html' in content_type:
+                    # Handle HTML pages
+                    self.save_and_store_code(url, response.text, file_path)
+                    return self.extract_urls(url, response.text)
+                
+                elif any(file in url.lower() for file in self.special_files):
+                    # Handle special files like robots.txt
+                    self.save_and_store_code(url, response.text, file_path)
+                    return []
+                
+                elif any(ext in file_path.lower() for ext in self.media_extensions) and self.download_media:
+                    # Handle media files if allowed
+                    self.save_file(url, response.content, file_path, is_binary=True)
+                    return []
+                
+                elif any(ext in file_path.lower() for ext in self.archive_extensions) and self.download_archives:
+                    # Handle archive files if allowed
+                    self.save_file(url, response.content, file_path, is_binary=True)
+                    return []
+                
+                elif any(ext in file_path.lower() for ext in self.text_extensions) and self.download_text:
+                    # Handle text files if allowed
+                    self.save_and_store_code(url, response.text, file_path)
+                    return []
+                
                 return []
             
-            # Parse the URL
-            parsed_url = urlparse(url)
-            
-            # Check if we should download this file
-            content_type = response.headers.get('Content-Type', '').lower()
-            file_path = self.get_file_path(url)
-            
-            # Handle based on content type and extension
-            if any(ext in file_path.lower() for ext in self.code_extensions):
-                # Handle code files
-                self.save_and_store_code(url, response.text, file_path)
-                # Extract URLs from code files as well
-                return self.extract_urls(url, response.text)
-            
-            elif 'text/html' in content_type:
-                # Handle HTML pages
-                self.save_and_store_code(url, response.text, file_path)
-                return self.extract_urls(url, response.text)
-            
-            elif any(file in url.lower() for file in self.special_files):
-                # Handle special files like robots.txt
-                self.save_and_store_code(url, response.text, file_path)
+            except requests.exceptions.RequestException as e:
+                retry_count += 1
+                if retry_count < max_retries:
+                    logger.warning(f"Retry {retry_count}/{max_retries} for {url}: {e}")
+                    time.sleep(1)  # Wait 1 second before retrying
+                else:
+                    logger.error(f"Error processing {url} after {max_retries} retries: {e}")
+                    return []
+            except Exception as e:
+                logger.error(f"Error processing {url}: {e}")
                 return []
-            
-            elif any(ext in file_path.lower() for ext in self.media_extensions) and self.download_media:
-                # Handle media files if allowed
-                self.save_file(url, response.content, file_path, is_binary=True)
-                return []
-            
-            elif any(ext in file_path.lower() for ext in self.archive_extensions) and self.download_archives:
-                # Handle archive files if allowed
-                self.save_file(url, response.content, file_path, is_binary=True)
-                return []
-            
-            elif any(ext in file_path.lower() for ext in self.text_extensions) and self.download_text:
-                # Handle text files if allowed
-                self.save_and_store_code(url, response.text, file_path)
-                return []
-            
-            return []
-        
-        except Exception as e:
-            logger.error(f"Error processing {url}: {e}")
-            return []
     
     def get_file_path(self, url):
         """
@@ -274,16 +322,27 @@ class WebScanner:
             file_path (str): Path to save the file to
             is_binary (bool): Whether the content is binary
         """
-        try:
-            mode = 'wb' if is_binary else 'w'
-            encoding = None if is_binary else 'utf-8'
-            
-            with open(file_path, mode, encoding=encoding) as f:
-                f.write(content)
-            
-            logger.info(f"Saved: {url} to {file_path}")
-        except Exception as e:
-            logger.error(f"Error saving {url} to {file_path}: {e}")
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                mode = 'wb' if is_binary else 'w'
+                encoding = None if is_binary else 'utf-8'
+                
+                with open(file_path, mode, encoding=encoding) as f:
+                    f.write(content)
+                
+                logger.info(f"Saved: {url} to {file_path}")
+                return  # Success, exit the function
+            except Exception as e:
+                retry_count += 1
+                if retry_count < max_retries:
+                    logger.warning(f"Retry {retry_count}/{max_retries} saving {url} to {file_path}: {e}")
+                    time.sleep(1)  # Wait 1 second before retrying
+                else:
+                    logger.error(f"Error saving {url} to {file_path} after {max_retries} retries: {e}")
+                    return
     
     def save_and_store_code(self, url, content, file_path):
         """
@@ -1001,7 +1060,8 @@ class WebScanner:
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write("# WebScann3r Final Report\n\n")
             f.write(f"**Target:** {self.target_url}\n")
-            f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"**Scan Directory:** {self.target_dir}\n\n")
             
             f.write("## Scan Summary\n\n")
             f.write(f"- **Scan Mode:** {'Same domain only' if self.same_domain_only else 'All domains'}\n")
