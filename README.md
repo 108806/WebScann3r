@@ -22,12 +22,14 @@ A comprehensive web reconnaissance tool for red team assessments. This tool scan
 - **Domain Scope Control**: Option to limit scanning to the target domain or include external domains
 - **Media Filtering**: Option to skip media files (images, videos) to save space and time
 - **Comprehensive Reporting**: Generates detailed reports of the scan findings and security issues
+- **JSON Dump**: Creates a structured JSON file with all discovered files and directories
+- **Target Organization**: Organizes all outputs by target site in a structured directory layout
 
 ## Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/webscann3r.git
+   git clone https://github.com/108806/webscann3r.git
    cd webscann3r
    ```
 
@@ -116,6 +118,9 @@ After scanning, WebScann3r generates several reports in the specified reports di
 1. **security_report.md**: Details all potential security issues found in the code
 2. **function_usage_report.md**: Shows how many times each function is called
 3. **final_report.md**: A comprehensive summary of the scan results
+4. **discovered_files_dirs.json**: A structured JSON file containing all discovered files and directories
+
+The reports are organized by target site in a structure like `targets/sitename/reports/`.
 
 ## Recommendations for Use
 

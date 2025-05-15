@@ -25,14 +25,52 @@ class Reporter:
         # Create report directory if it doesn't exist
         os.makedirs(self.report_dir, exist_ok=True)
     
-    def generate_security_report(self, security_findings):
+    def generate_files_directories_json(self, visited_urls, downloaded_files):
         """
-        Generate a security report based on findings
+        Generate a JSON file containing all discovered files and directories
         
         Args:
-            security_findings (dict): Dictionary of security findings
+            visited_urls (list): List of visited URLs
+            downloaded_files (list): List of downloaded files
         """
-        logger.info("Generating security report...")
+        logger.info("Generating files and directories JSON dump...")
+        
+        # Extract base domain from target URL
+        from urllib.parse import urlparse
+        base_domain = urlparse(self.target_url).netloc
+        
+        # Get all discovered files and directories
+        files_dirs = {
+            "target_url": self.target_url,
+            "base_domain": base_domain,
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "visited_urls": visited_urls,
+            "downloaded_files": downloaded_files,
+            "directories": []
+        }
+        
+        # Create a set of unique directory paths from all downloaded files
+        dir_set = set()
+        for file_path in downloaded_files:
+            # Get the directory portion of the path
+            dir_path = os.path.dirname(file_path)
+            # Split by "/" to get all parent directories too
+            parts = dir_path.split("/")
+            current = ""
+            for part in parts:
+                if part:
+                    current = os.path.join(current, part) if current else part
+                    dir_set.add(current)
+        
+        files_dirs["directories"] = sorted(list(dir_set))
+        
+        # Save to JSON file
+        json_path = os.path.join(self.report_dir, 'discovered_files_dirs.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(files_dirs, f, indent=4)
+        
+        logger.info(f"Files and directories JSON dump generated: {json_path}")
+        return json_path
         
         report_path = os.path.join(self.report_dir, 'security_report.md')
         
@@ -106,6 +144,11 @@ class Reporter:
         """
         logger.info("Generating final report...")
         
+        # First, generate the JSON dump of all discovered files and directories
+        visited_urls = scan_info.get('visited_urls', [])
+        downloaded_files = scan_info.get('downloaded_files', [])
+        json_path = self.generate_files_directories_json(visited_urls, downloaded_files)
+        
         report_path = os.path.join(self.report_dir, 'final_report.md')
         
         with open(report_path, 'w', encoding='utf-8') as f:
@@ -121,6 +164,8 @@ class Reporter:
             f.write(f"  - **Media Files:** {'Yes' if scan_info.get('download_media', False) else 'No'}\n")
             f.write(f"  - **Archive Files:** {'Yes' if scan_info.get('download_archives', False) else 'No'}\n")
             f.write(f"  - **Text Files:** {'Yes' if scan_info.get('download_text', False) else 'No'}\n\n")
+            
+            f.write(f"- **Files and Directories JSON:** [discovered_files_dirs.json]({os.path.basename(json_path)})\n\n")
             
             # Structure map
             f.write("## Site Structure\n\n")

@@ -97,6 +97,7 @@ ENV/
 .mypy_cache/
 
 # WebScann3r specific
+/targets/
 /downloads/
 /reports/
 webscann3r.log

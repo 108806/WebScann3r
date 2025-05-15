@@ -25,15 +25,15 @@ logging.basicConfig(
 logger = logging.getLogger('WebScann3r')
 
 class WebScanner:
-    def __init__(self, target_url, download_dir='downloads', report_dir='reports', same_domain_only=True, 
+    def __init__(self, target_url, download_dir='targets', report_dir='targets', same_domain_only=True, 
                  download_media=False, download_archives=False, download_text=False, threads=10, timeout=30):
         """
         Initialize the web scanner
         
         Args:
             target_url (str): Target URL to scan
-            download_dir (str): Directory to save downloaded files
-            report_dir (str): Directory to save reports
+            download_dir (str): Base directory to save downloaded files
+            report_dir (str): Base directory to save reports
             same_domain_only (bool): Whether to only scan the same domain
             download_media (bool): Whether to download media files
             download_archives (bool): Whether to download archive files
@@ -50,9 +50,12 @@ class WebScanner:
         self.threads = threads
         self.timeout = timeout
         
+        # Create site-specific directories
+        site_dir = self.base_domain.replace(':', '_')
+        
         # Directories setup
-        self.download_dir = os.path.abspath(download_dir)
-        self.report_dir = os.path.abspath(report_dir)
+        self.download_dir = os.path.abspath(os.path.join(download_dir, site_dir, 'downloads'))
+        self.report_dir = os.path.abspath(os.path.join(report_dir, site_dir, 'reports'))
         
         # Create directories if they don't exist
         os.makedirs(self.download_dir, exist_ok=True)
@@ -692,11 +695,53 @@ class WebScanner:
         
         logger.info(f"Function usage report generated: {report_path}")
     
+    def generate_files_directories_json(self):
+        """
+        Generate a JSON file containing all discovered files and directories
+        """
+        logger.info("Generating files and directories JSON dump...")
+        
+        # Get all discovered files and directories
+        files_dirs = {
+            "target_url": self.target_url,
+            "base_domain": self.base_domain,
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "visited_urls": list(self.visited_urls),
+            "downloaded_files": list(self.code_files.keys()),
+            "directories": []
+        }
+        
+        # Create a set of unique directory paths from all downloaded files
+        dir_set = set()
+        for file_path in self.code_files.keys():
+            # Get the directory portion of the path
+            dir_path = os.path.dirname(file_path)
+            # Split by "/" to get all parent directories too
+            parts = dir_path.split("/")
+            current = ""
+            for part in parts:
+                if part:
+                    current = os.path.join(current, part) if current else part
+                    dir_set.add(current)
+        
+        files_dirs["directories"] = sorted(list(dir_set))
+        
+        # Save to JSON file
+        json_path = os.path.join(self.report_dir, 'discovered_files_dirs.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(files_dirs, f, indent=4)
+        
+        logger.info(f"Files and directories JSON dump generated: {json_path}")
+        return json_path
+
     def generate_final_report(self):
         """
         Generate a final comprehensive report
         """
         logger.info("Generating final report...")
+        
+        # First, generate the JSON dump of all discovered files and directories
+        json_path = self.generate_files_directories_json()
         
         report_path = os.path.join(self.report_dir, 'final_report.md')
         
@@ -713,6 +758,8 @@ class WebScanner:
             f.write(f"  - **Media Files:** {'Yes' if self.download_media else 'No'}\n")
             f.write(f"  - **Archive Files:** {'Yes' if self.download_archives else 'No'}\n")
             f.write(f"  - **Text Files:** {'Yes' if self.download_text else 'No'}\n\n")
+            
+            f.write(f"- **Files and Directories JSON:** [discovered_files_dirs.json]({os.path.basename(json_path)})\n\n")
             
             # Structure map
             f.write("## Site Structure\n\n")
