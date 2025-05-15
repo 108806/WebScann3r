@@ -19,9 +19,12 @@ A comprehensive web reconnaissance tool for red team assessments. This tool scan
 - **Deep Analysis**: Scans JavaScript files for additional links and resources
 - **Security Analysis**: Checks for potentially dangerous code and security issues
 - **Function Usage Tracking**: Reports on how frequently each function is used across the codebase
+- **API Endpoint Detection**: Automatically identifies and catalogs API endpoints and routes
+- **Technology Stack Identification**: Detects software versions and creates a technology profile
 - **Domain Scope Control**: Option to limit scanning to the target domain or include external domains
 - **Media Filtering**: Option to skip media files (images, videos) to save space and time
 - **Comprehensive Reporting**: Generates detailed reports of the scan findings and security issues
+- **JSON Data Exports**: Provides structured JSON files for integration with other tools
 - **JSON Dump**: Creates a structured JSON file with all discovered files and directories
 - **Target Organization**: Organizes all outputs by target site in a structured directory layout
 
@@ -119,6 +122,8 @@ After scanning, WebScann3r generates several reports in the specified reports di
 2. **function_usage_report.md**: Shows how many times each function is called
 3. **final_report.md**: A comprehensive summary of the scan results
 4. **discovered_files_dirs.json**: A structured JSON file containing all discovered files and directories
+5. **discovered_endpoints.json**: A JSON file listing all detected API endpoints and routes
+6. **discovered_versions.json**: A JSON file containing all detected software versions and technology stack information
 
 The reports are organized by target site in a structure like `targets/sitename/reports/`.
 

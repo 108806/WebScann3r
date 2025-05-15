@@ -67,6 +67,12 @@ class WebScanner:
         # Dictionary of code files and their contents
         self.code_files = {}
         
+        # Storage for detected software/library versions
+        self.detected_versions = {}
+        
+        # Storage for API endpoints and routes
+        self.api_endpoints = set()
+        
         # File extensions to analyze
         self.code_extensions = ('.js', '.php', '.css', '.html')
         
@@ -159,6 +165,24 @@ class WebScanner:
         
         try:
             response = requests.get(url, headers=self.headers, timeout=self.timeout, allow_redirects=True)
+            
+            # Check for API endpoints
+            url_path = urlparse(url).path.lower()
+            if (('/api/' in url_path) or 
+                ('/service/' in url_path) or 
+                ('/services/' in url_path) or 
+                ('/v1/' in url_path) or 
+                ('/v2/' in url_path) or 
+                ('/v3/' in url_path) or 
+                ('/graphql' in url_path) or 
+                ('/rest/' in url_path) or 
+                url_path.endswith('.json') or 
+                url_path.endswith('.xml')
+               ):
+                self.api_endpoints.add(url)
+
+            # Extract version information from headers
+            self.extract_versions_from_headers(response.headers)
             
             if response.status_code != 200:
                 logger.warning(f"Received status code {response.status_code} for {url}")
@@ -357,6 +381,76 @@ class WebScanner:
         
         # Remove duplicates and return
         return list(set(discovered_urls))
+    
+    def extract_versions_from_headers(self, headers):
+        """
+        Extract version information from HTTP headers
+        
+        Args:
+            headers (dict): HTTP headers to analyze
+        """
+        # Headers that might contain version information
+        version_headers = [
+            'Server', 
+            'X-Powered-By', 
+            'X-AspNet-Version', 
+            'X-Generator', 
+            'X-Version',
+            'X-Runtime',
+            'X-AspNetMvc-Version',
+            'X-Drupal-Version',
+            'X-Joomla-Version',
+            'X-Shopify-API-Version',
+            'X-WordPress-Version',
+            'X-Rack-Version',
+            'Liferay-Portal',
+            'Powered-By'
+        ]
+        
+        # Check each relevant header
+        for header in version_headers:
+            if header in headers:
+                value = headers[header]
+                # Store the version information
+                self.detected_versions[f"Header: {header}"] = value
+                
+                # Try to extract more specific version information with regex
+                if header.lower() == 'server':
+                    # Common patterns: Apache/2.4.41 (Ubuntu) or nginx/1.18.0
+                    server_patterns = [
+                        r'apache[\/\s](\d+\.\d+\.\d+)',
+                        r'nginx[\/\s](\d+\.\d+\.\d+)',
+                        r'microsoft-iis[\/\s](\d+\.\d+)',
+                        r'lighttpd[\/\s](\d+\.\d+\.\d+)',
+                        r'caddy[\/\s](\d+\.\d+\.\d+)',
+                    ]
+                    
+                    for pattern in server_patterns:
+                        match = re.search(pattern, value, re.IGNORECASE)
+                        if match:
+                            software = pattern.split('[')[0]
+                            version = match.group(1)
+                            self.detected_versions[f"{software.capitalize()} Version"] = version
+                
+                elif header.lower() == 'x-powered-by':
+                    # Common patterns: PHP/7.4.3, ASP.NET
+                    xpowered_patterns = [
+                        r'php[\/\s](\d+\.\d+\.\d+)',
+                        r'asp\.net',
+                        r'express',
+                        r'rails[\/\s](\d+\.\d+\.\d+)',
+                    ]
+                    
+                    for pattern in xpowered_patterns:
+                        match = re.search(pattern, value, re.IGNORECASE)
+                        if match:
+                            technology = pattern.split('[')[0] if '[' in pattern else pattern
+                            technology = technology.replace(r'\.', '.').capitalize()
+                            if match.groups():
+                                version = match.group(1)
+                                self.detected_versions[f"{technology} Version"] = version
+                            else:
+                                self.detected_versions[technology] = "Detected (version unknown)"
     
     def extract_urls_from_js(self, base_url, js_content):
         """
@@ -587,6 +681,34 @@ class WebScanner:
                 r'(?i)python(?:\/|-)(\d+\.\d+\.\d+)',
                 r'(?i)ruby(?:\/|-)(\d+\.\d+\.\d+)',
                 r'(?i)node(?:\/|-)(\d+\.\d+\.\d+)',
+                r'(?i)nginx(?:\/|-)(\d+\.\d+\.\d+)',
+                r'(?i)apache(?:\/|-)(\d+\.\d+\.\d+)',
+                r'(?i)server:\s*nginx\/(\d+\.\d+\.\d+)',
+                r'(?i)server:\s*apache\/(\d+\.\d+\.\d+)',
+                r'(?i)server:\s*microsoft-iis\/(\d+\.\d+)',
+                r'(?i)x-powered-by:\s*php\/(\d+\.\d+\.\d+)',
+                r'(?i)x-powered-by:\s*asp\.net',
+                r'(?i)x-powered-by:\s*([^\s\r\n]+)',
+                r'(?i)x-generator:\s*([^\s\r\n]+)',
+                r'(?i)powered-by:\s*([^\s\r\n]+)',
+                r'(?i)x-aspnet-version:\s*([^\s\r\n]+)',
+                r'(?i)laravel[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)django[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)symfony[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)drupal[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)joomla[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)rails[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)flask[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)spring[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)tomcat[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)jetty[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)weblogic[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)websphere[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)mysql[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)postgresql[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)mongodb[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)redis[\/\.-](\d+\.\d+\.\d+)',
+                r'(?i)oracle[\/\.-](\d+\.\d+\.\d+)',
             ],
         }
         
@@ -613,9 +735,39 @@ class WebScanner:
                             'code': line,
                             'match': match.group(0),
                         })
+                        
+                        # For software/library versions, store the detected version
+                        if issue_type == 'Software/Library Versions' and match.groups():
+                            software_name = pattern.split(r'(?i)')[1].split(r'[\/\.-]')[0].capitalize()
+                            version = match.group(1)
+                            self.detected_versions[f"{software_name} Version"] = version
                 
                 if matches:
                     file_findings[issue_type] = matches
+            
+            # Look for potential API endpoints
+            api_patterns = [
+                r'(?i)(?:get|post|put|delete|patch|options|head)\s+[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)api_(?:url|endpoint|path|route)\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)endpoint\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)url\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+\/api\/[\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)fetch\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)axios\.(?:get|post|put|delete|patch)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)\.ajax\s*\(\s*\{\s*url\s*:\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)route\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+            ]
+            
+            for pattern in api_patterns:
+                for match in re.finditer(pattern, content):
+                    if match.groups():
+                        endpoint = match.group(1)
+                        # If it's a relative URL, make it absolute
+                        if endpoint.startswith('/'):
+                            # Use the base domain to create an absolute URL
+                            endpoint_url = f"https://{self.base_domain}{endpoint}"
+                            self.api_endpoints.add(endpoint_url)
+                        elif endpoint.startswith('http'):
+                            self.api_endpoints.add(endpoint)
             
             if file_findings:
                 security_findings[file_path] = file_findings
@@ -695,6 +847,105 @@ class WebScanner:
         
         logger.info(f"Function usage report generated: {report_path}")
     
+    def generate_endpoints_json(self):
+        """
+        Generate a JSON file containing all discovered API endpoints
+        """
+        logger.info("Generating API endpoints JSON dump...")
+        
+        # Get all discovered endpoints
+        endpoints_data = {
+            "target_url": self.target_url,
+            "base_domain": self.base_domain,
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "endpoints": sorted(list(self.api_endpoints)),
+            "count": len(self.api_endpoints)
+        }
+        
+        # Categorize endpoints by path segments
+        endpoint_categories = {}
+        for endpoint in self.api_endpoints:
+            parsed = urlparse(endpoint)
+            path = parsed.path
+            
+            # Group by first part of path after domain
+            parts = path.strip('/').split('/')
+            if parts:
+                category = parts[0] if parts[0] else "root"
+                if category not in endpoint_categories:
+                    endpoint_categories[category] = []
+                endpoint_categories[category].append(endpoint)
+        
+        endpoints_data["categories"] = endpoint_categories
+        
+        # Save to JSON file
+        json_path = os.path.join(self.report_dir, 'discovered_endpoints.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(endpoints_data, f, indent=4)
+        
+        logger.info(f"API endpoints JSON dump generated: {json_path}")
+        return json_path
+    
+    def generate_versions_json(self):
+        """
+        Generate a JSON file containing all discovered software and library versions
+        """
+        logger.info("Generating software versions JSON dump...")
+        
+        # Get all discovered versions
+        versions_data = {
+            "target_url": self.target_url,
+            "base_domain": self.base_domain,
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "versions": self.detected_versions,
+            "count": len(self.detected_versions)
+        }
+        
+        # Categorize versions
+        version_categories = {
+            "server": {},
+            "framework": {},
+            "language": {},
+            "database": {},
+            "frontend": {},
+            "cms": {},
+            "other": {}
+        }
+        
+        # Categorize the detected versions
+        for software, version in self.detected_versions.items():
+            # Server software
+            if any(server in software.lower() for server in ['apache', 'nginx', 'iis', 'lighttpd', 'caddy']):
+                version_categories['server'][software] = version
+            # Frameworks
+            elif any(framework in software.lower() for framework in ['laravel', 'symfony', 'django', 'rails', 'express', 'spring']):
+                version_categories['framework'][software] = version
+            # Languages
+            elif any(language in software.lower() for language in ['php', 'python', 'ruby', 'node', 'asp.net']):
+                version_categories['language'][software] = version
+            # Databases
+            elif any(db in software.lower() for db in ['mysql', 'postgresql', 'mongodb', 'redis', 'oracle']):
+                version_categories['database'][software] = version
+            # Frontend libraries
+            elif any(frontend in software.lower() for frontend in ['jquery', 'bootstrap', 'angular', 'react', 'vue']):
+                version_categories['frontend'][software] = version
+            # CMS
+            elif any(cms in software.lower() for cms in ['wordpress', 'drupal', 'joomla']):
+                version_categories['cms'][software] = version
+            # Others
+            else:
+                version_categories['other'][software] = version
+        
+        versions_data["categories"] = version_categories
+        
+        # Save to JSON file
+        json_path = os.path.join(self.report_dir, 'discovered_versions.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(versions_data, f, indent=4)
+        
+        logger.info(f"Software versions JSON dump generated: {json_path}")
+        return json_path
+    
     def generate_files_directories_json(self):
         """
         Generate a JSON file containing all discovered files and directories
@@ -740,8 +991,10 @@ class WebScanner:
         """
         logger.info("Generating final report...")
         
-        # First, generate the JSON dump of all discovered files and directories
-        json_path = self.generate_files_directories_json()
+        # First, generate the JSON dumps
+        files_dirs_json = self.generate_files_directories_json()
+        endpoints_json = self.generate_endpoints_json()
+        versions_json = self.generate_versions_json()
         
         report_path = os.path.join(self.report_dir, 'final_report.md')
         
@@ -754,12 +1007,17 @@ class WebScanner:
             f.write(f"- **Scan Mode:** {'Same domain only' if self.same_domain_only else 'All domains'}\n")
             f.write(f"- **URLs Visited:** {len(self.visited_urls)}\n")
             f.write(f"- **Files Downloaded:** {len(self.code_files)}\n")
+            f.write(f"- **API Endpoints Found:** {len(self.api_endpoints)}\n")
+            f.write(f"- **Software Versions Detected:** {len(self.detected_versions)}\n")
             f.write(f"- **Download Settings:**\n")
             f.write(f"  - **Media Files:** {'Yes' if self.download_media else 'No'}\n")
             f.write(f"  - **Archive Files:** {'Yes' if self.download_archives else 'No'}\n")
             f.write(f"  - **Text Files:** {'Yes' if self.download_text else 'No'}\n\n")
             
-            f.write(f"- **Files and Directories JSON:** [discovered_files_dirs.json]({os.path.basename(json_path)})\n\n")
+            f.write("## JSON Reports\n\n")
+            f.write(f"- **Files and Directories:** [discovered_files_dirs.json]({os.path.basename(files_dirs_json)})\n")
+            f.write(f"- **API Endpoints:** [discovered_endpoints.json]({os.path.basename(endpoints_json)})\n")
+            f.write(f"- **Software Versions:** [discovered_versions.json]({os.path.basename(versions_json)})\n\n")
             
             # Structure map
             f.write("## Site Structure\n\n")
@@ -817,6 +1075,52 @@ class WebScanner:
                     f.write("\nSee the detailed function usage report for more information.\n\n")
                 else:
                     f.write("No function calls detected.\n\n")
+            
+            # API Endpoints summary
+            if self.api_endpoints:
+                f.write("## API Endpoints Summary\n\n")
+                f.write(f"**Total API Endpoints Found:** {len(self.api_endpoints)}\n\n")
+                
+                # Display up to 10 endpoints
+                endpoints_to_show = sorted(list(self.api_endpoints))[:10]
+                if endpoints_to_show:
+                    f.write("### Sample Endpoints\n\n")
+                    for endpoint in endpoints_to_show:
+                        f.write(f"- `{endpoint}`\n")
+                    
+                    if len(self.api_endpoints) > 10:
+                        f.write(f"\n...and {len(self.api_endpoints) - 10} more. See the detailed API endpoints JSON file for complete listing.\n\n")
+            
+            # Software versions summary
+            if self.detected_versions:
+                f.write("## Software Versions Summary\n\n")
+                f.write(f"**Total Software/Library Versions Detected:** {len(self.detected_versions)}\n\n")
+                
+                # Group by category
+                server_versions = {k: v for k, v in self.detected_versions.items() if any(server in k.lower() for server in ['server', 'apache', 'nginx', 'iis'])}
+                language_versions = {k: v for k, v in self.detected_versions.items() if any(lang in k.lower() for lang in ['php', 'python', 'ruby', 'node'])}
+                framework_versions = {k: v for k, v in self.detected_versions.items() if any(fw in k.lower() for fw in ['laravel', 'symfony', 'django', 'rails', 'express'])}
+                
+                if server_versions:
+                    f.write("### Server Software\n\n")
+                    for software, version in server_versions.items():
+                        f.write(f"- **{software}:** {version}\n")
+                    f.write("\n")
+                
+                if language_versions:
+                    f.write("### Programming Languages\n\n")
+                    for software, version in language_versions.items():
+                        f.write(f"- **{software}:** {version}\n")
+                    f.write("\n")
+                
+                if framework_versions:
+                    f.write("### Frameworks\n\n")
+                    for software, version in framework_versions.items():
+                        f.write(f"- **{software}:** {version}\n")
+                    f.write("\n")
+                
+                if len(self.detected_versions) > len(server_versions) + len(language_versions) + len(framework_versions):
+                    f.write("See the complete software versions JSON file for more details.\n\n")
             
             # Recommendations
             f.write("## Recommendations\n\n")
