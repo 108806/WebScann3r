@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from collections import Counter
 from colorama import Fore, Style, init
+from .reporter import Reporter
 
 # Initialize colorama
 init(autoreset=True)
@@ -126,6 +127,9 @@ class WebScanner:
         
         # Function call counters
         self.function_calls = {}
+        
+        # Dictionary to store potential sinks
+        self.potential_sinks = []
         
     def start_scan(self):
         """
@@ -804,6 +808,49 @@ class WebScanner:
                 if matches:
                     file_findings[issue_type] = matches
             
+            # Sink detection: look for dangerous function calls and taint sinks
+            sink_patterns = [
+                r'(?i)eval\s*\(',
+                r'(?i)exec\s*\(',
+                r'(?i)system\s*\(',
+                r'(?i)popen\s*\(',
+                r'(?i)passthru\s*\(',
+                r'(?i)proc_open\s*\(',
+                r'(?i)assert\s*\(',
+                r'(?i)base64_decode\s*\(',
+                r'(?i)unserialize\s*\(',
+                r'(?i)document\.write\s*\(',
+                r'(?i)innerHTML\s*=\s*',
+                r'(?i)outerHTML\s*=\s*',
+                r'(?i)Function\s*\(',
+                r'(?i)setTimeout\s*\(',
+                r'(?i)setInterval\s*\(',
+                r'(?i)child_process\.exec\s*\(',
+                r'(?i)os\.system\s*\(',
+                r'(?i)subprocess\.(?:call|Popen|run)\s*\(',
+                r'(?i)input\s*\(',
+                r'(?i)pickle\.loads?\s*\(',
+                r'(?i)open\s*\(',
+                r'(?i)require\s*\(',
+                r'(?i)include\s*\(',
+                r'(?i)fetch\s*\(',
+                r'(?i)axios\.(?:get|post|put|delete|patch)\s*\(',
+                r'(?i)\.ajax\s*\(',
+            ]
+            for sink_pat in sink_patterns:
+                for match in re.finditer(sink_pat, content):
+                    line_number = content[:match.start()].count('\n') + 1
+                    code_line = content.splitlines()[line_number - 1].strip()
+                    self.potential_sinks.append({
+                        'file': file_path,
+                        'line': line_number,
+                        'sink': match.group(0),
+                        'code': code_line
+                    })
+        
+            if file_findings:
+                security_findings[file_path] = file_findings
+            
             # Look for potential API endpoints
             api_patterns = [
                 r'(?i)(?:get|post|put|delete|patch|options|head)\s+[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
@@ -828,54 +875,34 @@ class WebScanner:
                         elif endpoint.startswith('http'):
                             self.api_endpoints.add(endpoint)
             
-            if file_findings:
-                security_findings[file_path] = file_findings
-            
             # Count function calls in JS files
             if extension == '.js':
                 self.count_js_function_calls(content)
         
-        # Generate security report
-        self.generate_security_report(security_findings)
+        # Generate security report using Reporter class (with improved formatting and Berlin time)
+        from .reporter import Reporter
+        reporter = Reporter(self.target_url, report_dir=self.report_dir, download_dir=self.download_dir)
+        reporter.generate_security_report(security_findings, pattern_map=security_patterns)
+        
+        # After generating the security report, also generate a sinks report if sinks exist
+        if self.potential_sinks:
+            sinks_report_path = os.path.join(self.report_dir, 'sinks.md')
+            with open(sinks_report_path, 'w', encoding='utf-8') as f:
+                f.write("# Potential Sinks (Fuzzing Targets)\n\n")
+                f.write(f"Total potential sinks detected: {len(self.potential_sinks)}\n\n")
+                for i, sink in enumerate(self.potential_sinks, 1):
+                    f.write(f"## Sink {i}\n")
+                    f.write(f"- **File:** `{sink['file']}`\n")
+                    f.write(f"- **Line:** {sink['line']}\n")
+                    f.write(f"- **Sink:** `{sink['sink']}`\n")
+                    f.write(f"- **Code:**\n```{sink['code']}\n```\n\n")
+            # Add a reference to sinks.md in the security report for easier navigation
+            security_report_path = os.path.join(self.report_dir, 'security_report.md')
+            with open(security_report_path, 'a', encoding='utf-8') as f:
+                f.write("\n---\n**See [sinks.md](sinks.md) for detailed potential sink findings.**\n\n")
         
         # Generate function usage report
         self.generate_function_usage_report()
-    
-    def generate_security_report(self, security_findings):
-        """
-        Generate a security report based on findings
-        
-        Args:
-            security_findings (dict): Dictionary of security findings
-        """
-        logger.info("Generating security report...")
-        
-        report_path = os.path.join(self.report_dir, 'security_report.md')
-        
-        with open(report_path, 'w', encoding='utf-8') as f:
-            f.write("# WebScann3r Security Report\n\n")
-            f.write(f"**Target:** {self.target_url}\n")
-            f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            
-            if not security_findings:
-                f.write("No security issues found.\n")
-            else:
-                f.write("## Security Issues Found\n\n")
-                
-                issue_count = sum(len(issues) for file_issues in security_findings.values() for issues in file_issues.values())
-                f.write(f"Total issues found: {issue_count}\n\n")
-                
-                for file_path, file_findings in security_findings.items():
-                    f.write(f"### {file_path}\n\n")
-                    
-                    for issue_type, matches in file_findings.items():
-                        f.write(f"#### {issue_type}\n\n")
-                        
-                        for match in matches:
-                            f.write(f"- **Line {match['line']}:** `{match['code']}`\n")
-                            f.write(f"  - **Match:** `{match['match']}`\n\n")
-        
-        logger.info(f"Security report generated: {report_path}")
     
     def generate_function_usage_report(self):
         """
@@ -1101,86 +1128,99 @@ class WebScanner:
                 print_tree(self.download_dir)
             except Exception as e:
                 f.write(f"Error generating structure: {e}\n")
-            
             f.write("```\n\n")
             
-            # Security findings summary
-            security_report_path = os.path.join(self.report_dir, 'security_report.md')
+            # Potential Sinks summary
+            if self.potential_sinks:
+                f.write("## Potential Sinks Summary\n\n")
+                f.write(f"**Total Potential Sinks Detected:** {len(self.potential_sinks)}\n\n")
+                # Show up to 5 sample sinks
+                sample_sinks = self.potential_sinks[:5]
+                if sample_sinks:
+                    f.write("### Sample Sinks\n\n")
+                    for sink in sample_sinks:
+                        f.write(f"- `{sink['file']}` (line {sink['line']}): `{sink['sink']}`\n")
+                    if len(self.potential_sinks) > 5:
+                        f.write(f"\n...and {len(self.potential_sinks) - 5} more. See the detailed security report for more information.\n\n")
+            else:
+                f.write("## Potential Sinks Summary\n\nNo potential sinks detected.\n\n")
+
+            # Security findings summary (TLDR only)
+            security_report_path = os.path.join(self.report_dir, 'security_report.md');
             if os.path.exists(security_report_path):
                 with open(security_report_path, 'r', encoding='utf-8') as sr:
-                    security_report = sr.read()
-                    
-                    # Extract just the summary
-                    if "## Security Issues Found" in security_report:
-                        summary = security_report.split("## Security Issues Found")[1].split("###")[0].strip()
-                        f.write("## Security Issues Summary\n\n")
-                        f.write(f"{summary}\n\n")
-                        f.write("See the detailed security report for more information.\n\n")
-            
+                    security_report = sr.read();
+                    # Extract just the summary line (total issues found)
+                    if "Total issues found:" in security_report:
+                        summary_line = [line for line in security_report.splitlines() if line.strip().startswith("Total issues found:")];
+                        if summary_line:
+                            f.write("## Security Issues Summary\n\n");
+                            f.write(f"{summary_line[0]}\n\n");
+                            f.write("See the detailed security report for more information.\n\n");
             # Most used functions summary
-            function_report_path = os.path.join(self.report_dir, 'function_usage_report.md')
+            function_report_path = os.path.join(self.report_dir, 'function_usage_report.md');
             if os.path.exists(function_report_path):
-                f.write("## Most Used Functions\n\n")
+                f.write("## Most Used Functions\n\n");
                 
                 # Sort function calls by count (descending) and take top 10
-                sorted_functions = sorted(self.function_calls.items(), key=lambda x: x[1], reverse=True)[:10]
+                sorted_functions = sorted(self.function_calls.items(), key=lambda x: x[1], reverse=True)[:10];
                 
                 if sorted_functions:
-                    f.write("| Function | Call Count |\n")
-                    f.write("|----------|------------|\n")
+                    f.write("| Function | Call Count |\n");
+                    f.write("|----------|------------|\n");
                     
                     for function, count in sorted_functions:
-                        f.write(f"| `{function}` | {count} |\n")
+                        f.write(f"| `{function}` | {count} |\n");
                     
-                    f.write("\nSee the detailed function usage report for more information.\n\n")
+                    f.write("\nSee the detailed function usage report for more information.\n\n");
                 else:
-                    f.write("No function calls detected.\n\n")
+                    f.write("No function calls detected.\n\n");
             
             # API Endpoints summary
             if self.api_endpoints:
-                f.write("## API Endpoints Summary\n\n")
-                f.write(f"**Total API Endpoints Found:** {len(self.api_endpoints)}\n\n")
+                f.write("## API Endpoints Summary\n\n");
+                f.write(f"**Total API Endpoints Found:** {len(self.api_endpoints)}\n\n");
                 
                 # Display up to 10 endpoints
-                endpoints_to_show = sorted(list(self.api_endpoints))[:10]
+                endpoints_to_show = sorted(list(self.api_endpoints))[:10];
                 if endpoints_to_show:
-                    f.write("### Sample Endpoints\n\n")
+                    f.write("### Sample Endpoints\n\n");
                     for endpoint in endpoints_to_show:
-                        f.write(f"- `{endpoint}`\n")
+                        f.write(f"- `{endpoint}`\n");
                     
                     if len(self.api_endpoints) > 10:
-                        f.write(f"\n...and {len(self.api_endpoints) - 10} more. See the detailed API endpoints JSON file for complete listing.\n\n")
+                        f.write(f"\n...and {len(self.api_endpoints) - 10} more. See the detailed API endpoints JSON file for complete listing.\n\n");
             
             # Software versions summary
             if self.detected_versions:
-                f.write("## Software Versions Summary\n\n")
-                f.write(f"**Total Software/Library Versions Detected:** {len(self.detected_versions)}\n\n")
+                f.write("## Software Versions Summary\n\n");
+                f.write(f"**Total Software/Library Versions Detected:** {len(self.detected_versions)}\n\n");
                 
                 # Group by category
-                server_versions = {k: v for k, v in self.detected_versions.items() if any(server in k.lower() for server in ['server', 'apache', 'nginx', 'iis'])}
-                language_versions = {k: v for k, v in self.detected_versions.items() if any(lang in k.lower() for lang in ['php', 'python', 'ruby', 'node'])}
-                framework_versions = {k: v for k, v in self.detected_versions.items() if any(fw in k.lower() for fw in ['laravel', 'symfony', 'django', 'rails', 'express'])}
+                server_versions = {k: v for k, v in self.detected_versions.items() if any(server in k.lower() for server in ['server', 'apache', 'nginx', 'iis'])};
+                language_versions = {k: v for k, v in self.detected_versions.items() if any(lang in k.lower() for lang in ['php', 'python', 'ruby', 'node'])};
+                framework_versions = {k: v for k, v in self.detected_versions.items() if any(fw in k.lower() for fw in ['laravel', 'symfony', 'django', 'rails', 'express'])};
                 
                 if server_versions:
-                    f.write("### Server Software\n\n")
+                    f.write("### Server Software\n\n");
                     for software, version in server_versions.items():
-                        f.write(f"- **{software}:** {version}\n")
-                    f.write("\n")
+                        f.write(f"- **{software}:** {version}\n");
+                    f.write("\n");
                 
                 if language_versions:
-                    f.write("### Programming Languages\n\n")
+                    f.write("### Programming Languages\n\n");
                     for software, version in language_versions.items():
-                        f.write(f"- **{software}:** {version}\n")
-                    f.write("\n")
+                        f.write(f"- **{software}:** {version}\n");
+                    f.write("\n");
                 
                 if framework_versions:
-                    f.write("### Frameworks\n\n")
+                    f.write("### Frameworks\n\n");
                     for software, version in framework_versions.items():
-                        f.write(f"- **{software}:** {version}\n")
-                    f.write("\n")
+                        f.write(f"- **{software}:** {version}\n");
+                    f.write("\n");
                 
                 if len(self.detected_versions) > len(server_versions) + len(language_versions) + len(framework_versions):
-                    f.write("See the complete software versions JSON file for more details.\n\n")
+                    f.write("See the complete software versions JSON file for more details.\n\n");
             
             # Recommendations
             f.write("## Recommendations\n\n")
@@ -1202,3 +1242,8 @@ class WebScanner:
             f.write("3. Consider conducting more targeted security tests based on the findings.\n")
         
         logger.info(f"Final report generated: {report_path}")
+        
+        # --- Generate sensitive data JSON at the end of the scan ---
+        reporter = Reporter(self.target_url, report_dir=self.report_dir, download_dir=self.download_dir)
+        reporter.generate_sensitive_data_json(self.code_files, list(self.visited_urls), self.base_domain)
+        logger.info("Sensitive data JSON report generated at the end of scan.")

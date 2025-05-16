@@ -175,7 +175,89 @@ class SecurityAnalyzer:
                 r'(?i)json_decode\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
                 r'(?i)Marshal\.load\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
                 r'(?i)pickle\.loads?\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ]
+            ],
+            # Additional patterns and categories below:
+            'LDAP Injection': [
+                r'(?i)ldapsearch.*[+&|!].*\$',
+                r'(?i)(&(.*=\$.*))',
+            ],
+            'NoSQL Injection': [
+                r'(?i)db\..*\.find\(.*\$.*\)',
+                r'(?i)\$where\s*:\s*["]?.*',
+                r'(?i)\$ne\s*:\s*["]?.*',
+                r'(?i)\$gt\s*:\s*["]?.*',
+                r'(?i)\$lt\s*:\s*["]?.*',
+            ],
+            'Prototype Pollution': [
+                r'(?i)\["\]__proto__\["\]',
+                r'(?i)\["\]constructor\["\]',
+                r'(?i)\["\]prototype\["\]',
+            ],
+            'Insecure Randomness': [
+                r'(?i)Math\.random\(',
+                r'(?i)random\.random\(',
+                r'(?i)rand\(',
+                r'(?i)srand\(',
+            ],
+            'Weak JWT Secret': [
+                r'(?i)jwt\.sign\(.*[\'\"]{1,8}[\'\"]',
+            ],
+            'Unrestricted File Upload': [
+                r'(?i)multipart/form-data',
+                r'(?i)Content-Disposition: form-data; name=[\'\"]?file[\'\"]?',
+                r'(?i)upload\s*\(',
+            ],
+            'Directory Listing Enabled': [
+                r'(?i)Index of /',
+                r'(?i)Directory listing for /',
+            ],
+            'Server-Side Template Injection (SSTI)': [
+                r'(?i)\{\{.*\}\}',
+                r'(?i)\{%.*%\}',
+                r'(?i)\$\{.*\}',
+                r'(?i)<%.*%>',
+            ],
+            'Unvalidated Redirects': [
+                r'(?i)window\.location\s*=\s*.*',
+                r'(?i)header\(\s*[\'\"]Location:.*\$_(?:GET|POST|REQUEST|COOKIE)',
+            ],
+            'Sensitive Data Exposure': [
+                r'(?i)private_key',
+                r'(?i)BEGIN PRIVATE KEY',
+                r'(?i)BEGIN RSA PRIVATE KEY',
+                r'(?i)BEGIN DSA PRIVATE KEY',
+                r'(?i)BEGIN EC PRIVATE KEY',
+                r'(?i)BEGIN OPENSSH PRIVATE KEY',
+                r'(?i)BEGIN ENCRYPTED PRIVATE KEY',
+                r'(?i)password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+            ],
+            'CORS Misconfiguration': [
+                r'(?i)Access-Control-Allow-Origin:\s*\*',
+                r'(?i)Access-Control-Allow-Credentials:\s*true',
+            ],
+            'XML Injection': [
+                r'(?i)<\?xml.*\?>',
+                r'(?i)<!DOCTYPE.*>',
+            ],
+            'Insecure HTTP Headers': [
+                r'(?i)X-Frame-Options:\s*ALLOWALL',
+                r'(?i)X-Content-Type-Options:\s*none',
+                r'(?i)Strict-Transport-Security:\s*',
+            ],
+            'Use of Dangerous Functions': [
+                r'(?i)eval\(',
+                r'(?i)exec\(',
+                r'(?i)system\(',
+                r'(?i)popen\(',
+                r'(?i)passthru\(',
+                r'(?i)proc_open\(',
+                r'(?i)assert\(',
+                r'(?i)base64_decode\(',
+                r'(?i)unserialize\(',
+            ],
+            'Insecure Cookie Flags': [
+                r'(?i)Set-Cookie:.*(HttpOnly|Secure)',
+            ],
         }
         
         # Mapping security issues to OWASP Top 10 Categories
