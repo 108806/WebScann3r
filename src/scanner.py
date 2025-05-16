@@ -819,23 +819,104 @@ class WebScanner:
                 r'(?i)assert\s*\(',
                 r'(?i)base64_decode\s*\(',
                 r'(?i)unserialize\s*\(',
-                r'(?i)document\.write\s*\(',
+                r'(?i)document\\.write\s*\(',
+                r'(?i)document\\.writeln\s*\(',
                 r'(?i)innerHTML\s*=\s*',
                 r'(?i)outerHTML\s*=\s*',
+                r'(?i)dangerouslySetInnerHTML',
+                r'(?i)document\\.execCommand\s*\(',
                 r'(?i)Function\s*\(',
+                r'(?i)new Function',
+                r'(?i)window\\.Function',
+                r'(?i)window\\.eval',
                 r'(?i)setTimeout\s*\(',
                 r'(?i)setInterval\s*\(',
-                r'(?i)child_process\.exec\s*\(',
-                r'(?i)os\.system\s*\(',
-                r'(?i)subprocess\.(?:call|Popen|run)\s*\(',
+                r'(?i)child_process\\.exec\s*\(',
+                r'(?i)os\\.system\s*\(',
+                r'(?i)os\\.exec',
+                r'(?i)os\\.execl',
+                r'(?i)os\\.execle',
+                r'(?i)os\\.execlp',
+                r'(?i)os\\.execlpe',
+                r'(?i)os\\.execv',
+                r'(?i)os\\.execve',
+                r'(?i)os\\.execvp',
+                r'(?i)os\\.execvpe',
+                r'(?i)os\\.popen',
+                r'(?i)os\\.spawn',
+                r'(?i)os\\.fork',
+                r'(?i)os\\.forkpty',
+                r'(?i)os\\.kill',
+                r'(?i)os\\.killpg',
+                r'(?i)os\\.startfile',
+                r'(?i)subprocess\\.(?:call|Popen|run|check_call|check_output)\s*\(',
                 r'(?i)input\s*\(',
-                r'(?i)pickle\.loads?\s*\(',
+                r'(?i)pickle\\.loads?\s*\(',
+                r'(?i)pickle\\.load\s*\(',
+                r'(?i)yaml\\.load\s*\(',
+                r'(?i)marshal\\.loads\s*\(',
+                r'(?i)unmarshal\s*\(',
+                r'(?i)ObjectInputStream\\.readObject',
                 r'(?i)open\s*\(',
                 r'(?i)require\s*\(',
                 r'(?i)include\s*\(',
                 r'(?i)fetch\s*\(',
-                r'(?i)axios\.(?:get|post|put|delete|patch)\s*\(',
-                r'(?i)\.ajax\s*\(',
+                r'(?i)axios\\.(?:get|post|put|delete|patch)\s*\(',
+                r'(?i)\\.ajax\s*\(',
+                r'(?i)XMLHttpRequest',
+                r'(?i)http\\.request',
+                r'(?i)https\\.request',
+                r'(?i)requests\\.(get|post)',
+                r'(?i)urllib\\.request',
+                r'(?i)curl_exec',
+                r'(?i)curl_setopt',
+                r'(?i)curl_init',
+                r'(?i)socket',
+                r'(?i)netcat',
+                r'(?i)render_template',
+                r'(?i)render',
+                r'(?i)twig\\.render',
+                r'(?i)ejs\\.render',
+                r'(?i)mustache\\.render',
+                r'(?i)mysql_query',
+                r'(?i)mysqli_query',
+                r'(?i)pdo_query',
+                r'(?i)pg_query',
+                r'(?i)sqlite_query',
+                r'(?i)db\\.query',
+                r'(?i)fs\\.(readFile|writeFile|appendFile|createWriteStream|createReadStream|unlink|rmdir)',
+                r'(?i)file_get_contents',
+                r'(?i)file_put_contents',
+                r'(?i)readfile',
+                r'(?i)fopen',
+                r'(?i)shell_exec',
+                r'(?i)create_function',
+                r'(?i)preg_replace',
+                r'(?i)move_uploaded_file',
+                r'(?i)parse_str',
+                r'(?i)Runtime.getRuntime\\(\\)\\.exec',
+                r'(?i)ProcessBuilder',
+                r'(?i)Process.Start',
+                r'(?i)Assembly.Load',
+                r'(?i)AppDomain.CreateDomain',
+                r'(?i)Type.GetType',
+                r'(?i)dangerous_function',
+                r'(?i)dangerous_eval',
+                r'(?i)dangerous_exec',
+                r'(?i)compile\s*\(',
+                r'(?i)execfile\s*\(',
+                r'(?i)exec_module',
+                r'(?i)importlib.import_module',
+                r'(?i)document.location',
+                r'(?i)window.location',
+                r'(?i)location.href',
+                r'(?i)location.replace',
+                r'(?i)location.assign',
+                r'(?i)window.open',
+                r'(?i)window.postMessage',
+                r'(?i)document.cookie',
+                r'(?i)localStorage.setItem',
+                r'(?i)sessionStorage.setItem',
             ]
             for sink_pat in sink_patterns:
                 for match in re.finditer(sink_pat, content):
@@ -886,20 +967,71 @@ class WebScanner:
         
         # After generating the security report, also generate a sinks report if sinks exist
         if self.potential_sinks:
+            # Scoring for sink types
+            sink_score_map = {
+                # Code execution
+                'eval': 10, 'exec': 10, 'system': 10, 'popen': 8, 'passthru': 8, 'proc_open': 8, 'assert': 7,
+                'base64_decode': 6, 'unserialize': 9, 'Function': 8, 'setTimeout': 5, 'setInterval': 5,
+                'child_process.exec': 9, 'os.system': 9, 'subprocess': 8, 'input': 6, 'pickle.loads': 9,
+                'open': 5, 'require': 6, 'include': 6, 'fetch': 5, 'axios': 5, 'ajax': 5,
+                # Reflection and dynamic code
+                'new Function': 8, 'window.Function': 8, 'window.eval': 10, 'document.write': 8, 'document.writeln': 8,
+                'innerHTML': 7, 'outerHTML': 7, 'dangerouslySetInnerHTML': 8, 'document.execCommand': 7,
+                # File operations
+                'fopen': 6, 'file_get_contents': 6, 'readfile': 6, 'file_put_contents': 6, 'fs.readFile': 6, 'fs.writeFile': 6,
+                'fs.appendFile': 6, 'fs.createWriteStream': 6, 'fs.createReadStream': 6, 'fs.unlink': 6, 'fs.rmdir': 6,
+                # Deserialization
+                'pickle.load': 9, 'pickle.loads': 9, 'yaml.load': 8, 'marshal.loads': 8, 'unmarshal': 8, 'ObjectInputStream': 8,
+                # HTTP/network
+                'XMLHttpRequest': 5, 'http.request': 5, 'https.request': 5, 'requests.get': 5, 'requests.post': 5,
+                'urllib.request': 5, 'curl_exec': 6, 'curl_setopt': 6, 'curl_init': 6, 'socket': 6, 'netcat': 7,
+                # Template injection
+                'render': 7, 'render_template': 7, 'twig.render': 7, 'ejs.render': 7, 'mustache.render': 7,
+                # Database
+                'mysql_query': 8, 'mysqli_query': 8, 'pdo_query': 8, 'pg_query': 8, 'sqlite_query': 8, 'db.query': 8,
+                # System/process
+                'os.popen': 8, 'os.spawn': 8, 'os.exec': 10, 'os.execl': 10, 'os.execle': 10, 'os.execlp': 10, 'os.execlpe': 10,
+                'os.execv': 10, 'os.execve': 10, 'os.execvp': 10, 'os.execvpe': 10, 'os.fork': 8, 'os.forkpty': 8,
+                'os.kill': 7, 'os.killpg': 7, 'os.startfile': 7, 'os.system': 9, 'subprocess.Popen': 8, 'subprocess.call': 8,
+                'subprocess.run': 8, 'subprocess.check_call': 8, 'subprocess.check_output': 8,
+                # XSS/DOM
+                'document.location': 7, 'window.location': 7, 'location.href': 7, 'location.replace': 7, 'location.assign': 7,
+                'window.open': 6, 'window.postMessage': 6, 'document.cookie': 6, 'localStorage.setItem': 6, 'sessionStorage.setItem': 6,
+                # PHP-specific
+                'shell_exec': 8, 'create_function': 8, 'preg_replace': 7, 'move_uploaded_file': 7, 'parse_str': 7,
+                # Java-specific
+                'Runtime.getRuntime().exec': 10, 'ProcessBuilder': 8, 'ObjectInputStream.readObject': 8,
+                # .NET-specific
+                'Process.Start': 8, 'Assembly.Load': 8, 'AppDomain.CreateDomain': 7, 'Type.GetType': 7,
+                # Misc dangerous
+                'eval_r': 10, 'execfile': 9, 'compile': 8, 'exec_module': 8, 'importlib.import_module': 7,
+                'dangerous_function': 10, 'dangerous_eval': 10, 'dangerous_exec': 10
+            }
+
+            # Sort sinks by score descending
+            sorted_sinks = sorted(self.potential_sinks, key=lambda s: get_sink_score(s['sink']), reverse=True)
+
             sinks_report_path = os.path.join(self.report_dir, 'sinks.md')
             with open(sinks_report_path, 'w', encoding='utf-8') as f:
                 f.write("# Potential Sinks (Fuzzing Targets)\n\n")
                 f.write(f"Total potential sinks detected: {len(self.potential_sinks)}\n\n")
-                for i, sink in enumerate(self.potential_sinks, 1):
-                    f.write(f"## Sink {i}\n")
-                    f.write(f"- **File:** `{sink['file']}`\n")
-                    f.write(f"- **Line:** {sink['line']}\n")
-                    f.write(f"- **Sink:** `{sink['sink']}`\n")
-                    f.write(f"- **Code:**\n```{sink['code']}\n```\n\n")
+                f.write("| File | Line | Sink Type | Regex Triggered | Potential Sink Score |\n")
+                f.write("|------|------|-----------|-----------------|----------------------|\n")
+                for sink in sorted_sinks:
+                    file = os.path.basename(sink['file'])
+                    line = sink['line']
+                    sink_type = sink['sink'].split('(')[0].strip().replace('.', '')
+                    regex = sink['sink']
+                    score = get_sink_score(sink['sink'])
+                    f.write(f"| `{file}` | {line} | `{sink_type}` | `{regex}` | **{score}** |\n")
+                f.write("\n---\n\n")
+                f.write("**Legend:** Higher score = more dangerous sink.\n\n")
+                f.write("---\n\n")
+                f.write("**This is a summary. For code context, review the source files directly.**\n")
             # Add a reference to sinks.md in the security report for easier navigation
             security_report_path = os.path.join(self.report_dir, 'security_report.md')
             with open(security_report_path, 'a', encoding='utf-8') as f:
-                f.write("\n---\n**See [sinks.md](sinks.md) for detailed potential sink findings.**\n\n")
+                f.write("\n---\n**See [sinks.md](sinks.md) for a summary of potential sink findings.**\n\n")
         
         # Generate function usage report
         self.generate_function_usage_report()
@@ -1090,23 +1222,6 @@ class WebScanner:
             f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"**Scan Directory:** {self.target_dir}\n\n")
             
-            f.write("## Scan Summary\n\n")
-            f.write(f"- **Scan Mode:** {'Same domain only' if self.same_domain_only else 'All domains'}\n")
-            f.write(f"- **URLs Visited:** {len(self.visited_urls)}\n")
-            f.write(f"- **Files Downloaded:** {len(self.code_files)}\n")
-            f.write(f"- **API Endpoints Found:** {len(self.api_endpoints)}\n")
-            f.write(f"- **Software Versions Detected:** {len(self.detected_versions)}\n")
-            f.write(f"- **Download Settings:**\n")
-            f.write(f"  - **Media Files:** {'Yes' if self.download_media else 'No'}\n")
-            f.write(f"  - **Archive Files:** {'Yes' if self.download_archives else 'No'}\n")
-            f.write(f"  - **Text Files:** {'Yes' if self.download_text else 'No'}\n\n")
-            
-            f.write("## JSON Reports\n\n")
-            f.write(f"- **Files and Directories:** [discovered_files_dirs.json]({os.path.basename(files_dirs_json)})\n")
-            f.write(f"- **API Endpoints:** [discovered_endpoints.json]({os.path.basename(endpoints_json)})\n")
-            f.write(f"- **Software Versions:** [discovered_versions.json]({os.path.basename(versions_json)})\n\n")
-            
-            # Structure map
             f.write("## Site Structure\n\n")
             f.write("```\n")
             
