@@ -1,140 +1,44 @@
 # All patterns for XSS
 patterns = [
-    r'(?i)document\.write\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)\.innerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)\.outerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)eval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)setTimeout\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)setInterval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)new\s+Function\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)\.innerText\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)document\.body\.appendChild\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)\.insertAdjacentHTML\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
-    r'(?i)window\.location\s*=\s*.*',
-    r'(?i)document\.(?:URL|cookie|domain|referrer)',
-    r'(?i)on\w+\s*=\s*["\"][^"\"]*["\"]',
-    r'(?i)<svg[\s\S]*?>[\s\S]*?<\/svg>',
-    r'(?i)<math[\s\S]*?>[\s\S]*?<\/math>',
-    r'(?i)<iframe[\s\S]*?>[\s\S]*?<\/iframe>',
-    r'(?i)<script[\s\S]*?>[\s\S]*?<\/script>',
-    r'(?i)<img[\s\S]*?onerror\s*=\s*["\"][^"\"]*["\"]',
-    r'(?i)<body[\s\S]*?onload\s*=\s*["\"][^"\"]*["\"]',
-    r'(?i)\{\{.*\}\}',
-    r'(?i)<%=?\s*.*%>',
-    r'(?i)\$\{.*\}',
-    r'(?i)\bon[a-z]+\s*=\s*["\"][^"\"]*["\"]',
-    r'(?i)javascript:',
-    r'(?i)data:text/html',
-    r'(?i)vbscript:',
-    r'(?i)expression\s*\(',
-    r'(?i)document\.location',
-    r'(?i)location\.hash',
-    r'(?i)window\.name',
-    r'(?i)window\.open\s*\(',
-    r'(?i)window\.parent',
-    r'(?i)window\.top',
-    r'(?i)window\.frames',
-    r'(?i)window\.self',
-    r'(?i)window\.opener',
-    r'(?i)window\.frameElement',
-    r'(?i)window\.content',
-    r'(?i)window\.external',
-    r'(?i)window\.event',
-    r'(?i)window\.constructor',
-    r'(?i)window\.Function',
-    r'(?i)window\.call',
-    r'(?i)window\.apply',
-    r'(?i)window\.bind',
-    r'(?i)window\.setTimeout',
-    r'(?i)window\.setInterval',
-    r'(?i)window\.alert',
-    r'(?i)window\.prompt',
-    r'(?i)window\.confirm',
-    r'(?i)window\.console',
-    r'(?i)window\.eval',
-    r'(?i)window\.escape',
-    r'(?i)window\.unescape',
-    r'(?i)window\.encodeURI',
-    r'(?i)window\.decodeURI',
-    r'(?i)window\.encodeURIComponent',
-    r'(?i)window\.decodeURIComponent',
-    r'(?i)window\.parseInt',
-    r'(?i)window\.parseFloat',
-    r'(?i)window\.isNaN',
-    r'(?i)window\.isFinite',
-    r'(?i)window\.escape',
-    r'(?i)window\.unescape',
-    r'(?i)window\.btoa',
-    r'(?i)window\.atob',
-    r'(?i)window\.setImmediate',
-    r'(?i)window\.clearImmediate',
-    r'(?i)window\.requestAnimationFrame',
-    r'(?i)window\.cancelAnimationFrame',
-    r'(?i)window\.requestIdleCallback',
-    r'(?i)window\.cancelIdleCallback',
-    r'(?i)window\.postMessage',
-    r'(?i)window\.addEventListener',
-    r'(?i)window\.removeEventListener',
-    r'(?i)window\.dispatchEvent',
-    r'(?i)window\.attachEvent',
-    r'(?i)window\.detachEvent',
-    r'(?i)window\.fireEvent',
-    r'(?i)window\.onerror',
-    r'(?i)window\.onload',
-    r'(?i)window\.onunload',
-    r'(?i)window\.onbeforeunload',
-    r'(?i)window\.onresize',
-    r'(?i)window\.onscroll',
-    r'(?i)window\.onmousemove',
-    r'(?i)window\.onmousedown',
-    r'(?i)window\.onmouseup',
-    r'(?i)window\.onmouseover',
-    r'(?i)window\.onmouseout',
-    r'(?i)window\.onmouseenter',
-    r'(?i)window\.onmouseleave',
-    r'(?i)window\.onkeydown',
-    r'(?i)window\.onkeyup',
-    r'(?i)window\.onkeypress',
-    r'(?i)window\.oninput',
-    r'(?i)window\.onchange',
-    r'(?i)window\.onsubmit',
-    r'(?i)window\.onreset',
-    r'(?i)window\.onselect',
-    r'(?i)window\.onblur',
-    r'(?i)window\.onfocus',
-    r'(?i)window\.oncontextmenu',
-    r'(?i)window\.ondrag',
-    r'(?i)window\.ondrop',
-    r'(?i)window\.ondragstart',
-    r'(?i)window\.ondragend',
-    r'(?i)window\.ondragenter',
-    r'(?i)window\.ondragleave',
-    r'(?i)window\.ondragover',
-    r'(?i)window\.oncopy',
-    r'(?i)window\.oncut',
-    r'(?i)window\.onpaste',
-    r'(?i)window\.onwheel',
-    r'(?i)window\.onmousewheel',
-    r'(?i)window\.onabort',
-    r'(?i)window\.oncanplay',
-    r'(?i)window\.oncanplaythrough',
-    r'(?i)window\.ondurationchange',
-    r'(?i)window\.onemptied',
-    r'(?i)window\.onended',
-    r'(?i)window\.onerror',
-    r'(?i)window\.onloadeddata',
-    r'(?i)window\.onloadedmetadata',
-    r'(?i)window\.onloadstart',
-    r'(?i)window\.onpause',
-    r'(?i)window\.onplay',
-    r'(?i)window\.onplaying',
-    r'(?i)window\.onprogress',
-    r'(?i)window\.onratechange',
-    r'(?i)window\.onseeked',
-    r'(?i)window\.onseeking',
-    r'(?i)window\.onstalled',
-    r'(?i)window\.onsuspend',
-    r'(?i)window\.ontimeupdate',
-    r'(?i)window\.onvolumechange',
-    r'(?i)window\.onwaiting',
+    r'(?i)document\.write\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS document.write with user input
+    r'(?i)\.innerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS innerHTML with user input
+    r'(?i)\.outerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS outerHTML with user input
+    r'(?i)eval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS eval with user input
+    r'(?i)setTimeout\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS setTimeout with user input
+    r'(?i)setInterval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS setInterval with user input
+    r'(?i)new\s+Function\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS Function() with user input
+    r'(?i)\.innerText\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS innerText with user input
+    r'(?i)document\.body\.appendChild\(.*\$_(?:GET|POST|REQUEST|COOKIE)', # appendChild with user input
+    r'(?i)\.insertAdjacentHTML\(.*\$_(?:GET|POST|REQUEST|COOKIE)', # insertAdjacentHTML with user input
+    r'(?i)window\.location\s*=\s*.*', # JS window.location assignment
+    r'(?i)document\.(?:URL|cookie|domain|referrer)', # JS document properties
+    r'(?i)on\w+\s*=\s*["\"][^"\"]*["\"]', # Inline event handlers
+    r'(?i)<svg[\s\S]*?>[\s\S]*?<\/svg>', # SVG tag XSS
+    r'(?i)<math[\s\S]*?>[\s\S]*?<\/math>', # MathML tag XSS
+    r'(?i)<iframe[\s\S]*?>[\s\S]*?<\/iframe>', # iframe tag XSS
+    r'(?i)<script[\s\S]*?>[\s\S]*?<\/script>', # script tag XSS
+    r'(?i)<img[\s\S]*?onerror\s*=\s*["\"][^"\"]*["\"]', # img onerror XSS
+    r'(?i)<body[\s\S]*?onload\s*=\s*["\"][^"\"]*["\"]', # body onload XSS
+    r'(?i)\{\{.*\}\}', # Template injection (Handlebars, etc.)
+    r'(?i)<%=?\s*.*%>', # Template injection (EJS, etc.)
+    r'(?i)\$\{.*\}', # Template injection (ES6, etc.)
+    r'(?i)\bon[a-z]+\s*=\s*["\"][^"\"]*["\"]', # Any on* event handler
+    r'(?i)javascript:', # javascript: URI
+    r'(?i)data:text/html', # data: URI
+    r'(?i)vbscript:', # vbscript: URI
+    r'(?i)expression\s*\(', # CSS expression()
+    r'(?i)document\.location', # document.location
+    r'(?i)location\.hash', # location.hash
+    r'(?i)window\.name', # window.name
+    r'(?i)window\.open\s*\(', # window.open()
+    r'(?i)window\.parent', # window.parent
+    r'(?i)window\.top', # window.top
+    r'(?i)window\.frames', # window.frames
+    r'(?i)window\.self', # window.self
+    r'(?i)window\.opener', # window.opener
+    r'(?i)window\.frameElement', # window.frameElement
+    r'(?i)window\.content', # window.content
+    r'(?i)window\.external', # window.external
+    r'(?i)<iframe[^>]+srcdoc=', # iframe srcdoc attribute
+    r'(?i)src\s*=\s*["\']data:text/html', # src=data:text/html
 ]

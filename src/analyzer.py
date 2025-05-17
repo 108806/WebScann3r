@@ -95,7 +95,33 @@ class SecurityAnalyzer:
             'Insecure Configuration': 'A05:2021-Security Misconfiguration',
             'CSRF Vulnerabilities': 'A01:2021-Broken Access Control',
             'JWT Issues': 'A02:2021-Cryptographic Failures',
-            'Deserialization': 'A08:2021-Software and Data Integrity Failures'
+            'Deserialization': 'A08:2021-Software and Data Integrity Failures',
+            'Software/Library Versions': 'A06:2021-Vulnerable and Outdated Components',
+            'LDAP Injection': 'A03:2021-Injection',
+            'NoSQL Injection': 'A03:2021-Injection',
+            'Prototype Pollution': 'A08:2021-Software and Data Integrity Failures',
+            'Insecure Randomness': 'A02:2021-Cryptographic Failures',
+            'Weak JWT Secret': 'A02:2021-Cryptographic Failures',
+            'Directory Listing Enabled': 'A05:2021-Security Misconfiguration',
+            'Server-Side Template Injection (SSTI)': 'A03:2021-Injection',
+            'Unrestricted File Upload': 'A01:2021-Broken Access Control',
+            'Unvalidated Redirects': 'A01:2021-Broken Access Control',
+            'Sensitive Data Exposure': 'A02:2021-Cryptographic Failures',
+            'CORS Misconfiguration': 'A05:2021-Security Misconfiguration',
+            'Insecure HTTP Headers': 'A05:2021-Security Misconfiguration',
+            'XML Injection': 'A03:2021-Injection',
+            'Insecure Cookie Flags': 'A05:2021-Security Misconfiguration',
+            'Use of Dangerous Functions': 'A03:2021-Injection',
+            'Race Condition': 'A01:2021-Broken Access Control',
+            'Business Logic Flaw': 'A04:2021-Insecure Design',
+            'Clickjacking': 'A05:2021-Security Misconfiguration',
+            'HTTP Parameter Pollution': 'A03:2021-Injection',
+            'Reflected File Download': 'A04:2021-Insecure Design',
+            'Log Injection': 'A09:2021-Security Logging and Monitoring Failures',
+            'Host Header Injection': 'A05:2021-Security Misconfiguration',
+            'Misconfigured Caching': 'A05:2021-Security Misconfiguration',
+            'Session Fixation': 'A07:2021-Identification and Authentication Failures',
+            'Insufficient Logging & Monitoring': 'A09:2021-Security Logging and Monitoring Failures',
         }
         
         # Risk levels for each vulnerability type
@@ -115,7 +141,32 @@ class SecurityAnalyzer:
             'CSRF Vulnerabilities': 'Medium',
             'JWT Issues': 'High',
             'Deserialization': 'High',
-            'Software/Library Versions': 'Medium'
+            'Software/Library Versions': 'Medium',
+            'LDAP Injection': 'High',
+            'NoSQL Injection': 'High',
+            'Prototype Pollution': 'High',
+            'Insecure Randomness': 'Medium',
+            'Weak JWT Secret': 'High',
+            'Directory Listing Enabled': 'Medium',
+            'Server-Side Template Injection (SSTI)': 'High',
+            'Unrestricted File Upload': 'High',
+            'Unvalidated Redirects': 'Medium',
+            'Sensitive Data Exposure': 'High',
+            'CORS Misconfiguration': 'Medium',
+            'Insecure HTTP Headers': 'Medium',
+            'XML Injection': 'High',
+            'Insecure Cookie Flags': 'Medium',
+            'Use of Dangerous Functions': 'High',
+            'Race Condition': 'High',
+            'Business Logic Flaw': 'High',
+            'Clickjacking': 'Medium',
+            'HTTP Parameter Pollution': 'Medium',
+            'Reflected File Download': 'Medium',
+            'Log Injection': 'Medium',
+            'Host Header Injection': 'High',
+            'Misconfigured Caching': 'Medium',
+            'Session Fixation': 'High',
+            'Insufficient Logging & Monitoring': 'Medium',
         }
         
         # Descriptions for each vulnerability type
@@ -135,7 +186,32 @@ class SecurityAnalyzer:
             'CSRF Vulnerabilities': 'Cross-Site Request Forgery (CSRF) attacks force authenticated users to submit unwanted requests to web applications. Without proper protection, attackers can trick users into performing actions they did not intend to perform.',
             'JWT Issues': 'JSON Web Token (JWT) vulnerabilities often stem from improper implementation or verification. Issues include weak signing algorithms, token tampering, and missing validation.',
             'Deserialization': 'Insecure deserialization vulnerabilities occur when applications deserialize data from untrusted sources without proper validation. This can lead to denial of service, authentication bypasses, or remote code execution.',
-            'Software/Library Versions': 'Using outdated libraries or software versions can expose the application to known vulnerabilities that have been fixed in newer versions. Regular updates are essential to maintain security.'
+            'Software/Library Versions': 'Using outdated libraries or software versions can expose the application to known vulnerabilities that have been fixed in newer versions. Regular updates are essential to maintain security.',
+            'LDAP Injection': 'LDAP injection occurs when untrusted input is used to construct LDAP queries, allowing attackers to modify queries and access unauthorized data.',
+            'NoSQL Injection': 'NoSQL injection vulnerabilities occur when user input is unsafely included in NoSQL queries, potentially allowing attackers to bypass authentication or extract data.',
+            'Prototype Pollution': 'Prototype pollution is a vulnerability that allows attackers to inject properties into JavaScript object prototypes, potentially leading to denial of service or code execution.',
+            'Insecure Randomness': 'Insecure randomness refers to the use of predictable or weak random number generators, which can undermine cryptographic operations and security controls.',
+            'Weak JWT Secret': 'Weak JWT secrets make it easier for attackers to forge or tamper with tokens, leading to authentication bypass or data exposure.',
+            'Directory Listing Enabled': 'Directory listing enabled allows attackers to view the contents of directories on the server, potentially exposing sensitive files.',
+            'Server-Side Template Injection (SSTI)': 'SSTI occurs when user input is unsafely embedded in server-side templates, allowing attackers to execute arbitrary code on the server.',
+            'Unrestricted File Upload': 'Unrestricted file upload vulnerabilities allow attackers to upload malicious files, which can lead to code execution or data compromise.',
+            'Unvalidated Redirects': 'Unvalidated redirects occur when user input is used to construct URLs for redirection without proper validation, potentially leading to phishing or malware attacks.',
+            'Sensitive Data Exposure': 'Sensitive data exposure occurs when applications do not adequately protect sensitive information such as passwords, credit card numbers, or personal data.',
+            'CORS Misconfiguration': 'CORS misconfiguration can allow unauthorized domains to access resources, leading to data theft or manipulation.',
+            'Insecure HTTP Headers': 'Insecure HTTP headers can expose applications to various attacks by not enforcing security policies in browsers.',
+            'XML Injection': 'XML injection occurs when user input is unsafely included in XML documents or queries, potentially allowing data manipulation or disclosure.',
+            'Insecure Cookie Flags': 'Insecure cookie flags (missing HttpOnly, Secure, or SameSite) can expose cookies to theft or misuse.',
+            'Use of Dangerous Functions': 'Use of dangerous functions (such as eval, exec, or system) can lead to code injection or execution vulnerabilities.',
+            'Race Condition': 'Race conditions occur when the outcome of a process depends on the sequence or timing of uncontrollable events, potentially allowing attackers to exploit timing windows for unauthorized actions.',
+            'Business Logic Flaw': 'Business logic flaws are weaknesses in the intended workflow of an application, allowing attackers to manipulate legitimate functionality for malicious purposes.',
+            'Clickjacking': 'Clickjacking is an attack that tricks users into clicking on something different from what the user perceives, potentially revealing confidential information or allowing unauthorized actions.',
+            'HTTP Parameter Pollution': 'HTTP Parameter Pollution occurs when multiple HTTP parameters with the same name are sent in a request, potentially bypassing input validation or causing unexpected application behavior.',
+            'Reflected File Download': 'Reflected File Download vulnerabilities occur when user input is reflected in downloadable files, potentially allowing attackers to trick users into downloading malicious files.',
+            'Log Injection': 'Log injection occurs when untrusted user input is written directly to logs, potentially allowing attackers to forge log entries or inject malicious content.',
+            'Host Header Injection': 'Host header injection occurs when applications use unvalidated Host headers, potentially leading to cache poisoning, password reset poisoning, or web cache deception.',
+            'Misconfigured Caching': 'Misconfigured caching can expose sensitive data to unauthorized users by improperly storing or serving cached content.',
+            'Session Fixation': 'Session fixation vulnerabilities allow attackers to set or reuse a valid session ID, potentially hijacking a user session.',
+            'Insufficient Logging & Monitoring': 'Insufficient logging and monitoring can allow attackers to perform malicious actions without detection, delaying response and remediation.',
         }
         
         # Mitigation recommendations for each vulnerability type
@@ -251,7 +327,182 @@ class SecurityAnalyzer:
                 'Use automated tools to check for outdated dependencies',
                 'Subscribe to security bulletins for used components',
                 'Implement a proper patch management process'
-            ]
+            ],
+            'LDAP Injection': [
+                'Use parameterized LDAP queries',
+                'Validate and sanitize all user inputs',
+                'Apply the principle of least privilege',
+                'Escape special characters in LDAP queries',
+                'Monitor and log LDAP access patterns'
+            ],
+            'NoSQL Injection': [
+                'Use safe query APIs that separate code from data',
+                'Validate and sanitize all user inputs',
+                'Avoid string concatenation in queries',
+                'Apply the principle of least privilege',
+                'Monitor and log database access patterns'
+            ],
+            'Prototype Pollution': [
+                'Avoid using user input to set object properties directly',
+                'Use libraries that protect against prototype pollution',
+                'Validate and sanitize all user inputs',
+                'Keep dependencies updated',
+                'Monitor for unexpected object property changes'
+            ],
+            'Insecure Randomness': [
+                'Use cryptographically secure random number generators',
+                'Avoid using Math.random() or similar for security-sensitive operations',
+                'Review all uses of randomness in the codebase',
+                'Document and test random number usage',
+                'Keep cryptographic libraries updated'
+            ],
+            'Weak JWT Secret': [
+                'Use strong, randomly generated secrets for signing JWTs',
+                'Rotate secrets regularly',
+                'Do not expose secrets in code or configuration',
+                'Monitor for brute-force attempts',
+                'Use environment variables for secret management'
+            ],
+            'Directory Listing Enabled': [
+                'Disable directory listing on the web server',
+                'Restrict access to sensitive directories',
+                'Use proper access controls',
+                'Remove unnecessary files from web directories',
+                'Monitor server configuration changes'
+            ],
+            'Server-Side Template Injection (SSTI)': [
+                'Avoid using user input in templates',
+                'Use template engines that auto-escape input',
+                'Validate and sanitize all template data',
+                'Apply the principle of least privilege',
+                'Monitor for unexpected template rendering behavior'
+            ],
+            'Unrestricted File Upload': [
+                'Restrict allowed file types and sizes',
+                'Scan uploaded files for malware',
+                'Store uploads outside the web root',
+                'Implement authentication and authorization checks',
+                'Rename uploaded files to prevent overwriting'
+            ],
+            'Unvalidated Redirects': [
+                'Avoid using user input for redirect destinations',
+                'Implement a whitelist of allowed redirect URLs',
+                'Validate and sanitize all redirect parameters',
+                'Log and monitor redirect usage',
+                'Educate users about phishing risks'
+            ],
+            'Sensitive Data Exposure': [
+                'Encrypt sensitive data at rest and in transit',
+                'Mask sensitive data in logs and error messages',
+                'Use strong authentication and access controls',
+                'Regularly audit data storage and access',
+                'Comply with relevant data protection regulations'
+            ],
+            'CORS Misconfiguration': [
+                'Set strict CORS policies',
+                'Avoid using wildcard origins',
+                'Validate allowed origins and methods',
+                'Monitor CORS policy changes',
+                'Educate developers on CORS risks'
+            ],
+            'Insecure HTTP Headers': [
+                'Set security headers such as Content-Security-Policy, X-Frame-Options, and X-Content-Type-Options',
+                'Review and update header configurations regularly',
+                'Disable unnecessary headers',
+                'Monitor for header misconfigurations',
+                'Educate developers on secure header usage'
+            ],
+            'XML Injection': [
+                'Validate and sanitize all XML input',
+                'Use safe XML parsers',
+                'Avoid dynamic construction of XML documents from user input',
+                'Apply the principle of least privilege',
+                'Monitor for unexpected XML processing behavior'
+            ],
+            'Insecure Cookie Flags': [
+                'Set HttpOnly, Secure, and SameSite flags on all cookies',
+                'Avoid storing sensitive data in cookies',
+                'Regularly review cookie settings',
+                'Monitor for cookie theft attempts',
+                'Educate developers on secure cookie practices'
+            ],
+            'Use of Dangerous Functions': [
+                'Avoid using dangerous functions such as eval, exec, or system',
+                'Use safer alternatives or libraries',
+                'Validate and sanitize all inputs to such functions',
+                'Apply the principle of least privilege',
+                'Monitor for unexpected function usage'
+            ],
+            'Race Condition': [
+                'Use proper locking mechanisms and atomic operations',
+                'Avoid time-of-check to time-of-use (TOCTOU) bugs',
+                'Review concurrent code for shared resource access',
+                'Test for race conditions in multi-threaded environments',
+                'Apply principle of least privilege to critical operations'
+            ],
+            'Business Logic Flaw': [
+                'Review application workflows for abuse cases',
+                'Implement strict input validation and authorization checks',
+                'Perform threat modeling and business logic testing',
+                'Educate developers on business logic risks',
+                'Monitor for unusual application behavior'
+            ],
+            'Clickjacking': [
+                'Set X-Frame-Options header to DENY or SAMEORIGIN',
+                'Implement Content Security Policy (CSP) frame-ancestors directive',
+                'Avoid embedding sensitive pages in iframes',
+                'Educate users about clickjacking risks',
+                'Test application for frame-based attacks'
+            ],
+            'HTTP Parameter Pollution': [
+                'Deduplicate and validate all HTTP parameters',
+                'Use frameworks that handle parameter arrays safely',
+                'Avoid using user input directly in queries',
+                'Log and monitor for suspicious parameter usage',
+                'Educate developers on parameter pollution risks'
+            ],
+            'Reflected File Download': [
+                'Avoid reflecting user input in file names or contents',
+                'Validate and sanitize all user-supplied file names',
+                'Set appropriate Content-Disposition headers',
+                'Educate users about download risks',
+                'Monitor for suspicious file download activity'
+            ],
+            'Log Injection': [
+                'Sanitize user input before logging',
+                'Avoid logging sensitive or untrusted data',
+                'Implement log integrity controls',
+                'Monitor logs for suspicious entries',
+                'Educate developers on log injection risks'
+            ],
+            'Host Header Injection': [
+                'Validate and whitelist Host headers',
+                'Avoid using Host headers for security decisions',
+                'Set a default host value on the server',
+                'Monitor for unusual Host header values',
+                'Educate developers on host header risks'
+            ],
+            'Misconfigured Caching': [
+                'Set strict Cache-Control headers for sensitive data',
+                'Avoid caching authenticated or sensitive responses',
+                'Review and test cache configurations',
+                'Educate developers on caching risks',
+                'Monitor for cache-related incidents'
+            ],
+            'Session Fixation': [
+                'Regenerate session IDs after login',
+                'Do not accept session IDs from user input',
+                'Set session cookies with Secure and HttpOnly flags',
+                'Monitor for session fixation attempts',
+                'Educate developers on session management best practices'
+            ],
+            'Insufficient Logging & Monitoring': [
+                'Log all critical security events',
+                'Monitor logs for suspicious activity',
+                'Alert on detection of security incidents',
+                'Retain logs securely for forensic analysis',
+                'Regularly review and test logging mechanisms'
+            ],
         }
     
     def analyze_code(self, code_files):

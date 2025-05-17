@@ -1,192 +1,118 @@
 patterns = [
-    # Private keys and certificates
+    # TLDR: Detects PEM private key blocks
     r'(?i)BEGIN PRIVATE KEY',
+    # TLDR: Detects PEM RSA private key blocks
     r'(?i)BEGIN RSA PRIVATE KEY',
+    # TLDR: Detects PEM DSA private key blocks
     r'(?i)BEGIN DSA PRIVATE KEY',
+    # TLDR: Detects PEM EC private key blocks
     r'(?i)BEGIN EC PRIVATE KEY',
+    # TLDR: Detects OpenSSH private key blocks
     r'(?i)BEGIN OPENSSH PRIVATE KEY',
+    # TLDR: Detects encrypted private key blocks
     r'(?i)BEGIN ENCRYPTED PRIVATE KEY',
+    # TLDR: Detects PEM certificate blocks
     r'(?i)BEGIN CERTIFICATE',
+    # TLDR: Detects PGP private key blocks
     r'(?i)BEGIN PGP PRIVATE KEY BLOCK',
+    # TLDR: Detects PGP message blocks
     r'(?i)BEGIN PGP MESSAGE',
+    # TLDR: Detects PGP public key blocks
     r'(?i)BEGIN PGP PUBLIC KEY BLOCK',
+    # TLDR: Detects SSH2 encrypted private key blocks
     r'(?i)BEGIN SSH2 ENCRYPTED PRIVATE KEY',
+    # TLDR: Detects X509 certificate revocation lists
     r'(?i)BEGIN X509 CRL',
+    # TLDR: Detects Diffie-Hellman parameters
     r'(?i)BEGIN DH PARAMETERS',
+    # TLDR: Detects PKCS7 blocks
     r'(?i)BEGIN PKCS7',
+    # TLDR: Detects PKCS12 blocks
     r'(?i)BEGIN PKCS12',
+    # TLDR: Detects DSA parameters
     r'(?i)BEGIN DSA PARAMETERS',
+    # TLDR: Detects EC parameters
     r'(?i)BEGIN EC PARAMETERS',
+    # TLDR: Detects certificate signing requests
     r'(?i)BEGIN NEW CERTIFICATE REQUEST',
-    # Passwords, secrets, tokens, and credentials
+    # TLDR: Detects password assignments
     r'(?i)password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects passwd assignments
     r'(?i)passwd\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects pwd assignments
     r'(?i)pwd\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects secret assignments
     r'(?i)secret\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects api_key assignments
     r'(?i)api[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects apikey assignments
     r'(?i)apikey\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects access_key assignments
     r'(?i)access[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects secret_key assignments
     r'(?i)secret[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects client_secret assignments
     r'(?i)client[_-]?secret\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects access_token assignments
     r'(?i)access[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects auth_token assignments
     r'(?i)auth[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects refresh_token assignments
     r'(?i)refresh[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects Bearer tokens
     r'(?i)bearer\s+[A-Za-z0-9\-_\.]+',
+    # TLDR: Detects JWT tokens
     r'(?i)jwt\s*[:=]\s*[\'\"]?eyJ[A-Za-z0-9\-_\.]+',
+    # TLDR: Detects session_id assignments
     r'(?i)session[_-]?id\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects auth_cookie assignments
     r'(?i)auth[_-]?cookie\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects cookie assignments
     r'(?i)cookie\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects user_password assignments
     r'(?i)user[_-]?password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects user_secret assignments
     r'(?i)user[_-]?secret\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects user_token assignments
     r'(?i)user[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects user_key assignments
     r'(?i)user[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects db_password assignments
     r'(?i)db[_-]?password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects db_user assignments
     r'(?i)db[_-]?user\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects db_host assignments
     r'(?i)db[_-]?host\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects db_name assignments
     r'(?i)db[_-]?name\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects db_connection assignments
     r'(?i)db[_-]?connection\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects db_conn assignments
     r'(?i)db[_-]?conn\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects database_password assignments
     r'(?i)database[_-]?password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects database_user assignments
     r'(?i)database[_-]?user\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects database_host assignments
     r'(?i)database[_-]?host\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects database_name assignments
     r'(?i)database[_-]?name\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects database_connection assignments
     r'(?i)database[_-]?connection\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    # TLDR: Detects database_conn assignments
     r'(?i)database[_-]?conn\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
-    # Cloud provider keys and tokens
-    r'(?i)AKIA[0-9A-Z]{16}',  # AWS Access Key ID
-    r'(?i)ASIA[0-9A-Z]{16}',  # AWS Temporary Access Key
-    r'(?i)A3T[A-Z0-9]{16}',   # AWS Root Access Key
+    # TLDR: Detects AWS Access Key IDs
+    r'(?i)AKIA[0-9A-Z]{16}',
+    # TLDR: Detects AWS Temporary Access Keys
+    r'(?i)ASIA[0-9A-Z]{16}',
+    # TLDR: Detects AWS Root Access Keys
+    r'(?i)A3T[A-Z0-9]{16}',
+    # TLDR: Detects AWS secret access key assignments
     r'(?i)aws_secret_access_key\s*[:=]\s*[\'\"]?[^\'\"]{20,}[\'\"]?',
+    # TLDR: Detects AWS access key ID assignments
     r'(?i)aws_access_key_id\s*[:=]\s*[\'\"]?[^\'\"]{16,}[\'\"]?',
+    # TLDR: Detects AWS session token assignments
     r'(?i)aws_session_token\s*[:=]\s*[\'\"]?[^\'\"]{20,}[\'\"]?',
-    r'(?i)AIza[0-9A-Za-z\-_]{35}',  # Google API Key
-    r'(?i)ya29\.[0-9A-Za-z\-_]+',  # Google OAuth Access Token
-    r'(?i)AIzaSy[0-9A-ZaZ\-_]{35}',  # Google API Key (alt)
-    r'(?i)AIzaSy[0-9A-Za-z\-_]{35}',  # Google Cloud API Key (alt)
-    # Sensitive files and config files
-    r'(?i)\\.env',
-    r'(?i)\\.git-credentials',
-    r'(?i)\\.aws/credentials',
-    r'(?i)\\.docker/config\\.json',
-    r'(?i)\\.npmrc',
-    r'(?i)\\.pypirc',
-    r'(?i)\\.htpasswd',
-    r'(?i)\\.htaccess',
-    r'(?i)\\.bash_history',
-    r'(?i)\\.ssh/id_rsa',
-    r'(?i)\\.ssh/id_dsa',
-    r'(?i)\\.ssh/id_ecdsa',
-    r'(?i)\\.ssh/id_ed25519',
-    r'(?i)\\.azure/credentials',
-    r'(?i)\\.gcp/credentials',
-    r'(?i)\\.s3cfg',
-    r'(?i)\\.netrc',
-    r'(?i)\\.ftpconfig',
-    r'(?i)\\.pgpass',
-    r'(?i)\\.my.cnf',
-    r'(?i)\\.cfconfig.json',
-    r'(?i)\\.circleci/config.yml',
-    r'(?i)\\.travis.yml',
-    r'(?i)\\.gitlab-ci.yml',
-    r'(?i)\\.bitbucket-pipelines.yml',
-    r'(?i)\\.appveyor.yml',
-    r'(?i)\\.codecov.yml',
-    r'(?i)\\.coveralls.yml',
-    r'(?i)\\.dockercfg',
-    r'(?i)\\.exercism.json',
-    r'(?i)\\.gem/credentials',
-    r'(?i)\\.kube/config',
-    r'(?i)\\.m2/settings.xml',
-    r'(?i)\\.npm/_auth',
-    r'(?i)\\.pypirc',
-    r'(?i)\\.rclone.conf',
-    r'(?i)\\.s3cfg',
-    r'(?i)\\.tugboat',
-    r'(?i)\\.yarnrc',
-    r'(?i)id_rsa',
-    r'(?i)id_dsa',
-    r'(?i)id_ecdsa',
-    r'(?i)id_ed25519',
-    r'(?i)credentials.json',
-    r'(?i)secrets.json',
-    r'(?i)config.json',
-    r'(?i)settings.json',
-    r'(?i)database.yml',
-    r'(?i)web.config',
-    r'(?i)app.config',
-    r'(?i)secrets.yml',
-    r'(?i)prod.secret.exs',
-    r'(?i)prod.secret.eex',
-    r'(?i)prod.secret.sls',
-    r'(?i)prod.secret.yaml',
-    r'(?i)prod.secret.json',
-    r'(?i)prod.secret.ini',
-    r'(?i)prod.secret.conf',
-    r'(?i)prod.secret.txt',
-    r'(?i)prod.secret.env',
-    r'(?i)prod.secret.xml',
-    r'(?i)prod.secret.php',
-    r'(?i)prod.secret.py',
-    r'(?i)prod.secret.rb',
-    r'(?i)prod.secret.sh',
-    r'(?i)prod.secret.bash',
-    r'(?i)prod.secret.zsh',
-    r'(?i)prod.secret.ps1',
-    r'(?i)prod.secret.bat',
-    r'(?i)prod.secret.cmd',
-    r'(?i)prod.secret.vbs',
-    r'(?i)prod.secret.js',
-    r'(?i)prod.secret.ts',
-    r'(?i)prod.secret.go',
-    r'(?i)prod.secret.java',
-    r'(?i)prod.secret.c',
-    r'(?i)prod.secret.cpp',
-    r'(?i)prod.secret.cs',
-    r'(?i)prod.secret.swift',
-    r'(?i)prod.secret.kt',
-    r'(?i)prod.secret.scala',
-    r'(?i)prod.secret.dart',
-    r'(?i)prod.secret.r',
-    r'(?i)prod.secret.pl',
-    r'(?i)prod.secret.pm',
-    r'(?i)prod.secret.lua',
-    r'(?i)prod.secret.rs',
-    r'(?i)prod.secret.ex',
-    r'(?i)prod.secret.exs',
-    r'(?i)prod.secret.eex',
-    r'(?i)prod.secret.sls',
-    r'(?i)prod.secret.yaml',
-    r'(?i)prod.secret.json',
-    r'(?i)prod.secret.ini',
-    r'(?i)prod.secret.conf',
-    r'(?i)prod.secret.txt',
-    r'(?i)prod.secret.env',
-    r'(?i)prod.secret.xml',
-    r'(?i)prod.secret.php',
-    r'(?i)prod.secret.py',
-    r'(?i)prod.secret.rb',
-    r'(?i)prod.secret.sh',
-    r'(?i)prod.secret.bash',
-    r'(?i)prod.secret.zsh',
-    r'(?i)prod.secret.ps1',
-    r'(?i)prod.secret.bat',
-    r'(?i)prod.secret.cmd',
-    r'(?i)prod.secret.vbs',
-    r'(?i)prod.secret.js',
-    r'(?i)prod.secret.ts',
-    r'(?i)prod.secret.go',
-    r'(?i)prod.secret.java',
-    r'(?i)prod.secret.c',
-    r'(?i)prod.secret.cpp',
-    r'(?i)prod.secret.cs',
-    r'(?i)prod.secret.swift',
-    r'(?i)prod.secret.kt',
-    r'(?i)prod.secret.scala',
-    r'(?i)prod.secret.dart',
-    r'(?i)prod.secret.r',
-    r'(?i)prod.secret.pl',
-    r'(?i)prod.secret.pm',
-    r'(?i)prod.secret.lua',
-    r'(?i)prod.secret.rs',
-    r'(?i)prod.secret.ex',
+    # TLDR: Detects Google API keys
+    r'(?i)AIza[0-9A-Za-z\-_]{35}',
 ]

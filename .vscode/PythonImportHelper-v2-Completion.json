@@ -500,6 +500,15 @@
     {
         "label": "patterns",
         "kind": 5,
+        "importPath": "src.patterns.Business_Logic_Flaw",
+        "description": "src.patterns.Business_Logic_Flaw",
+        "peekOfCode": "patterns = [\n    # Business logic flaws are context-specific and often require manual review.\n    # Placeholder: Look for TODOs or FIXMEs that mention logic or security\n    r'TODO.*logic',\n    r'FIXME.*security',\n]",
+        "detail": "src.patterns.Business_Logic_Flaw",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
         "importPath": "src.patterns.CORS_Misconfiguration",
         "description": "src.patterns.CORS_Misconfiguration",
         "peekOfCode": "patterns = [\n    r'(?i)Access-Control-Allow-Origin:\\s*\\*',\n    r'(?i)Access-Control-Allow-Credentials:\\s*true',\n    r'(?i)Access-Control-Allow-Methods:\\s*GET, POST, PUT, DELETE, OPTIONS',\n    r'(?i)Access-Control-Allow-Headers:\\s*.*',\n    r'(?i)\\bCORS\\b',\n]",
@@ -518,9 +527,18 @@
     {
         "label": "patterns",
         "kind": 5,
+        "importPath": "src.patterns.Clickjacking",
+        "description": "src.patterns.Clickjacking",
+        "peekOfCode": "patterns = [\n    # Look for missing or misconfigured X-Frame-Options headers\n    r'X-Frame-Options\\s*[:=]\\s*(?!DENY|SAMEORIGIN)', # X-Frame-Options not DENY/SAMEORIGIN\n    r'response\\.headers\\s*\\[\\s*[\"\\'X-Frame-Options\\'\\\"]\\s*\\]\\s*=\\s*[\"\\'\\\"]?[^\\'\\\"]*', # Setting X-Frame-Options header\n    # Look for missing or misconfigured Content-Security-Policy frame-ancestors directives\n    r'Content-Security-Policy\\s*[:=]\\s*(?!.*frame-ancestors)', # CSP missing frame-ancestors\n]",
+        "detail": "src.patterns.Clickjacking",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
         "importPath": "src.patterns.Command_Injection",
         "description": "src.patterns.Command_Injection",
-        "peekOfCode": "patterns = [\n    r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\\s*\\(\\s*.*\\+',\n    r'(?i)spawn\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)child_process\\.exec\\s*\\(\\s*.*\\+',\n    r'(?i)Runtime\\.getRuntime\\(\\)\\.exec\\(.*\\+',\n    r'(?i)ProcessBuilder\\(.*\\+',\n    r'(?i)os\\.system\\(.*\\+',\n    r'(?i)subprocess\\.(?:call|Popen|run)\\(.*\\+',\n    r'(?i)os\\.system\\s*\\(\\s*.*\\)',",
+        "peekOfCode": "patterns = [\n    r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # PHP functions with user input\n    r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\\s*\\(\\s*.*\\+', # PHP functions with concat\n    r'(?i)spawn\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # spawn with user input\n    r'(?i)child_process\\.exec\\s*\\(\\s*.*\\+', # Node.js exec with concat\n    r'(?i)Runtime\\.getRuntime\\(\\)\\.exec\\(.*\\+', # Java exec with concat\n    r'(?i)ProcessBuilder\\(.*\\+', # Java ProcessBuilder with concat\n    r'(?i)os\\.system\\(.*\\+', # Python os.system with concat\n    r'(?i)subprocess\\.(?:call|Popen|run)\\(.*\\+', # Python subprocess with concat\n    r'(?i)os\\.system\\s*\\(\\s*.*\\)', # Python os.system any input",
         "detail": "src.patterns.Command_Injection",
         "documentation": {}
     },
@@ -529,7 +547,7 @@
         "kind": 5,
         "importPath": "src.patterns.Deserialization",
         "description": "src.patterns.Deserialization",
-        "peekOfCode": "patterns = [\n    r'(?i)unserialize\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)ObjectInputStream\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)yaml\\.load\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)json_decode\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)Marshal\\.load\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)pickle\\.loads?\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    # Expanded patterns for more Deserialization detection\n    r'(?i)pickle\\.load\\(\\s*.*\\)',  # Python\n    r'(?i)pickle\\.loads\\(\\s*.*\\)',  # Python",
+        "peekOfCode": "patterns = [\n    # TLDR: Detects PHP unserialize() with user input (dangerous deserialization)\n    r'(?i)unserialize\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    # TLDR: Detects Java ObjectInputStream with user input\n    r'(?i)ObjectInputStream\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    # TLDR: Detects Python/Ruby YAML load with user input\n    r'(?i)yaml\\.load\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    # TLDR: Detects PHP json_decode() with user input\n    r'(?i)json_decode\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    # TLDR: Detects Ruby Marshal.load() with user input",
         "detail": "src.patterns.Deserialization",
         "documentation": {}
     },
@@ -547,8 +565,17 @@
         "kind": 5,
         "importPath": "src.patterns.File_Inclusion",
         "description": "src.patterns.File_Inclusion",
-        "peekOfCode": "patterns = [\n    r'(?i)(?:include|require|include_once|require_once)\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)fopen\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)file_get_contents\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)readfile\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)new\\s+FileReader\\(.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)fs\\.readFile\\(.*\\+',\n    r'(?i)java\\.io\\.File\\(.*\\+',\n    r'(?i)open\\(.*\\+.*',\n    r'(?i)include\\s*[\\'\\\"]?\\s*\\$\\w+',",
+        "peekOfCode": "patterns = [\n    r'(?i)(?:include|require|include_once|require_once)\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # PHP file include with user input\n    r'(?i)fopen\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # fopen with user input\n    r'(?i)file_get_contents\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # file_get_contents with user input\n    r'(?i)readfile\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # readfile with user input\n    r'(?i)new\\s+FileReader\\(.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS FileReader with user input\n    r'(?i)fs\\.readFile\\(.*\\+', # Node.js fs.readFile with concat\n    r'(?i)java\\.io\\.File\\(.*\\+', # Java File with concat\n    r'(?i)open\\(.*\\+.*', # open() with concat\n    r'(?i)include\\s*[\\'\\\"]?\\s*\\$\\w+', # include with variable",
         "detail": "src.patterns.File_Inclusion",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
+        "importPath": "src.patterns.HTTP_Parameter_Pollution",
+        "description": "src.patterns.HTTP_Parameter_Pollution",
+        "peekOfCode": "patterns = [\n    # Look for code that parses query parameters without deduplication\n    r'get\\s*\\([^)]+\\)\\s*\\+\\s*get\\s*\\([^)]+\\)',\n    r'request\\.args\\.getlist\\(',\n]",
+        "detail": "src.patterns.HTTP_Parameter_Pollution",
         "documentation": {}
     },
     {
@@ -556,8 +583,17 @@
         "kind": 5,
         "importPath": "src.patterns.Hardcoded_Credentials",
         "description": "src.patterns.Hardcoded_Credentials",
-        "peekOfCode": "patterns = [\n    r'(?i)(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]',\n    r'(?i)Authorization:\\s*Basic\\s+[a-zA-Z0-9+/=]+',\n    r'(?i)Authorization:\\s*Bearer\\s+[a-zA-Z0-9._~+/=-]+',\n    r'(?i)(?:access_key|access_token|secret_key|api_key|apikey)\\s*[=:]\\s*[\\'\\\"][^\\'\\\"]{8,}[\\'\\\"]',\n    r'(?i)const\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]',\n    r'(?i)var\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]',\n    r'(?i)let\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]',\n    r'(?i)private\\s+(?:final\\s+)?String\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]',\n    r'(?i)env\\.(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]',",
+        "peekOfCode": "patterns = [\n    r'(?i)(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]', # Generic hardcoded secrets\n    r'(?i)Authorization:\\s*Basic\\s+[a-zA-Z0-9+/=]+', # Basic Auth header\n    r'(?i)Authorization:\\s*Bearer\\s+[a-zA-Z0-9._~+/=-]+', # Bearer Auth header\n    r'(?i)(?:access_key|access_token|secret_key|api_key|apikey)\\s*[=:]\\s*[\\'\\\"][^\\'\\\"]{8,}[\\'\\\"]', # Hardcoded API/secret keys\n    r'(?i)const\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]', # JS const secret\n    r'(?i)var\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]', # JS var secret\n    r'(?i)let\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]', # JS let secret\n    r'(?i)private\\s+(?:final\\s+)?String\\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]', # Java private String secret\n    r'(?i)env\\.(?:password|passwd|pwd|token|secret|api_key|apikey)\\s*=\\s*[\\'\\\"][^\\'\\\"]+[\\'\\\"]', # env. secret",
         "detail": "src.patterns.Hardcoded_Credentials",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
+        "importPath": "src.patterns.Host_Header_Injection",
+        "description": "src.patterns.Host_Header_Injection",
+        "peekOfCode": "patterns = [\n    # Look for usage of unvalidated Host headers\n    r'request\\.headers\\s*\\[\\s*[\"\\'Host\\'\\\"]\\s*\\]',\n    r'HTTP_HOST',\n]",
+        "detail": "src.patterns.Host_Header_Injection",
         "documentation": {}
     },
     {
@@ -565,7 +601,7 @@
         "kind": 5,
         "importPath": "src.patterns.Information_Disclosure",
         "description": "src.patterns.Information_Disclosure",
-        "peekOfCode": "patterns = [\n    r'(?i)console\\.log\\s*\\(',\n    r'(?i)alert\\s*\\(',\n    r'(?i)print_r\\s*\\(',\n    r'(?i)var_dump\\s*\\(',\n    r'(?i)phpinfo\\s*\\(',\n    r'(?i)<!--\\s*DEBUG',\n    r'(?i)//\\s*DEBUG',\n    r'(?i)^\\s*echo\\s+.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.debug\\s*\\(',",
+        "peekOfCode": "patterns = [\n    r'(?i)console\\.log\\s*\\(', # JS console.log\n    r'(?i)alert\\s*\\(', # JS alert\n    r'(?i)print_r\\s*\\(', # PHP print_r\n    r'(?i)var_dump\\s*\\(', # PHP var_dump\n    r'(?i)phpinfo\\s*\\(', # PHP phpinfo\n    r'(?i)<!--\\s*DEBUG', # HTML debug comment\n    r'(?i)//\\s*DEBUG', # JS debug comment\n    r'(?i)^\\s*echo\\s+.*\\$_(?:GET|POST|REQUEST|COOKIE)', # PHP echo with user input\n    r'(?i)\\.debug\\s*\\(', # .debug() call",
         "detail": "src.patterns.Information_Disclosure",
         "documentation": {}
     },
@@ -574,7 +610,7 @@
         "kind": 5,
         "importPath": "src.patterns.Insecure_Configuration",
         "description": "src.patterns.Insecure_Configuration",
-        "peekOfCode": "patterns = [\n    r'(?i)allow_url_include\\s*=\\s*On',\n    r'(?i)allow_url_fopen\\s*=\\s*On',\n    r'(?i)display_errors\\s*=\\s*On',\n    r'(?i)expose_php\\s*=\\s*On',\n    r'(?i)disable_functions\\s*=\\s*',\n    r'(?i)safe_mode\\s*=\\s*Off',\n    r'(?i)X-XSS-Protection:\\s*0',\n    r'(?i)Access-Control-Allow-Origin:\\s*\\*',\n    r'(?i)helmet.noCache\\(\\s*false\\s*\\)',",
+        "peekOfCode": "patterns = [\n    r'(?i)allow_url_include\\s*=\\s*On', # PHP allow_url_include On\n    r'(?i)allow_url_fopen\\s*=\\s*On', # PHP allow_url_fopen On\n    r'(?i)display_errors\\s*=\\s*On', # PHP display_errors On\n    r'(?i)expose_php\\s*=\\s*On', # PHP expose_php On\n    r'(?i)disable_functions\\s*=\\s*', # PHP disable_functions\n    r'(?i)safe_mode\\s*=\\s*Off', # PHP safe_mode Off\n    r'(?i)X-XSS-Protection:\\s*0', # X-XSS-Protection disabled\n    r'(?i)Access-Control-Allow-Origin:\\s*\\*', # CORS allow all\n    r'(?i)helmet.noCache\\(\\s*false\\s*\\)', # helmet.noCache false",
         "detail": "src.patterns.Insecure_Configuration",
         "documentation": {}
     },
@@ -583,7 +619,7 @@
         "kind": 5,
         "importPath": "src.patterns.Insecure_Cookie_Flags",
         "description": "src.patterns.Insecure_Cookie_Flags",
-        "peekOfCode": "patterns = [\n    r'(?i)Set-Cookie:.*(HttpOnly|Secure)',\n    r'(?i)Set-Cookie:.*SameSite=None',\n    r'(?i)Set-Cookie:.*Domain=',\n    r'(?i)Set-Cookie:.*Path=',\n]",
+        "peekOfCode": "patterns = [\n    r'(?i)Set-Cookie:.*(HttpOnly|Secure)',\n    r'(?i)Set-Cookie:.*SameSite=None',\n    r'(?i)Set-Cookie:.*Domain=',\n    r'(?i)Set-Cookie:.*Path=',\n    r'(?i)Set-Cookie:((?!Secure).)*$',\n    r'(?i)Set-Cookie:((?!HttpOnly).)*$',\n]",
         "detail": "src.patterns.Insecure_Cookie_Flags",
         "documentation": {}
     },
@@ -601,7 +637,7 @@
         "kind": 5,
         "importPath": "src.patterns.Insecure_HTTP_Headers",
         "description": "src.patterns.Insecure_HTTP_Headers",
-        "peekOfCode": "patterns = [\n    r'(?i)X-Frame-Options:\\s*ALLOWALL',\n    r'(?i)X-Content-Type-Options:\\s*none',\n    r'(?i)Strict-Transport-Security:\\s*',\n    r'(?i)X-XSS-Protection:\\s*0',\n    r'(?i)X-Powered-By:\\s*.*',\n    r'(?i)Server:\\s*.*',\n]",
+        "peekOfCode": "patterns = [\n    r'(?i)X-Frame-Options:\\s*ALLOWALL',\n    r'(?i)X-Content-Type-Options:\\s*none',\n    r'(?i)Strict-Transport-Security:\\s*$',\n    r'(?i)X-XSS-Protection:\\s*0',\n    r'(?i)X-Powered-By:\\s*.*',\n    r'(?i)Server:\\s*.*',\n    r'(?i)Content-Security-Policy:\\s*$',\n]",
         "detail": "src.patterns.Insecure_HTTP_Headers",
         "documentation": {}
     },
@@ -612,6 +648,15 @@
         "description": "src.patterns.Insecure_Randomness",
         "peekOfCode": "patterns = [\n    r'(?i)Math\\.random\\(',\n    r'(?i)random\\.random\\(',\n    r'(?i)rand\\(',\n    r'(?i)srand\\(',\n    r'(?i)\\brandom\\b',\n    r'(?i)\\bSecureRandom\\b',\n    r'(?i)\\bgetrand\\b',\n    r'(?i)\\bdrand48\\b',\n    r'(?i)\\brandom_device\\b',",
         "detail": "src.patterns.Insecure_Randomness",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
+        "importPath": "src.patterns.Insufficient_Logging_Monitoring",
+        "description": "src.patterns.Insufficient_Logging_Monitoring",
+        "peekOfCode": "patterns = [\n    # Look for absence of logging for critical actions (placeholder)\n    # This is hard to pattern-match, so we use a placeholder\n    r'pass\\s*#\\s*no\\s*logging',\n    r'TODO.*log',\n]",
+        "detail": "src.patterns.Insufficient_Logging_Monitoring",
         "documentation": {}
     },
     {
@@ -628,8 +673,26 @@
         "kind": 5,
         "importPath": "src.patterns.LDAP_Injection",
         "description": "src.patterns.LDAP_Injection",
-        "peekOfCode": "patterns = [\n    r'(?i)ldapsearch.*[+&|!].*\\$',\n    r'(?i)(&(.*=\\$.*))',\n    r'(?i)(&(.*=\\*.*))',\n    r'(?i)filter=.*\\(|\\)',\n    r'(?i)(&(objectClass=*))',\n    r'(?i)\\bldap_.*',\n    r'(?i)\\bldap_(add|delete|modify|search|bind|connect)\\b',\n    r'(?i)\\bfilter=\\$[\\w]+',\n]",
+        "peekOfCode": "patterns = [\n    # TLDR: Detects ldapsearch command with special LDAP filter characters and variable\n    r'(?i)ldapsearch.*[+&|!].*\\$',\n    # TLDR: Detects LDAP filter with variable assignment\n    r'(?i)(&(.*=\\$.*))',\n    # TLDR: Detects LDAP filter with wildcard assignment\n    r'(?i)(&(.*=\\*.*))',\n    # TLDR: Detects filter parameter with parentheses (potential injection)\n    r'(?i)filter=.*\\(|\\)',\n    # TLDR: Detects objectClass filter with wildcard",
         "detail": "src.patterns.LDAP_Injection",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
+        "importPath": "src.patterns.Log_Injection",
+        "description": "src.patterns.Log_Injection",
+        "peekOfCode": "patterns = [\n    # Look for direct logging of user input\n    r'logger\\.info\\s*\\(.*request',\n    r'log\\s*\\(.*request',\n]",
+        "detail": "src.patterns.Log_Injection",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
+        "importPath": "src.patterns.Misconfigured_Caching",
+        "description": "src.patterns.Misconfigured_Caching",
+        "peekOfCode": "patterns = [\n    # Look for missing or insecure Cache-Control headers\n    r'Cache-Control\\s*[:=]\\s*(public|no-cache|no-store|must-revalidate)?', # Cache-Control header\n    r'response\\.headers\\s*\\[.*Cache-Control.*\\]\\s*=\\s*', # Setting Cache-Control header\n    r'Pragma:\\s*no-cache', # Pragma no-cache header\n    r'Expires:\\s*0', # Expires 0 header\n]",
+        "detail": "src.patterns.Misconfigured_Caching",
         "documentation": {}
     },
     {
@@ -637,7 +700,7 @@
         "kind": 5,
         "importPath": "src.patterns.NoSQL_Injection",
         "description": "src.patterns.NoSQL_Injection",
-        "peekOfCode": "patterns = [\n    r'(?i)db\\..*\\.find\\(.*\\$.*\\)',\n    r'(?i)\\$where\\s*:\\s*[\"\\']?.*',\n    r'(?i)\\$ne\\s*:\\s*[\"\\']?.*',\n    r'(?i)\\$gt\\s*:\\s*[\"\\']?.*',\n    r'(?i)\\$lt\\s*:\\s*[\"\\']?.*',\n    r'(?i)\\$regex\\s*:\\s*[\"\\']?.*',\n    r'(?i)\\bMongoClient\\b',\n    r'(?i)\\bmongoose\\.model\\(',\n    r'(?i)\\bcollection\\.find\\(',",
+        "peekOfCode": "patterns = [\n    # TLDR: Detects MongoDB find() with $-prefixed operator (potential injection)\n    r'(?i)db\\..*\\.find\\(.*\\$.*\\)',\n    # TLDR: Detects $where operator in NoSQL queries\n    r'(?i)\\$where\\s*:\\s*[\"\\']?.*',\n    # TLDR: Detects $ne (not equal) operator in NoSQL queries\n    r'(?i)\\$ne\\s*:\\s*[\"\\']?.*',\n    # TLDR: Detects $gt (greater than) operator in NoSQL queries\n    r'(?i)\\$gt\\s*:\\s*[\"\\']?.*',\n    # TLDR: Detects $lt (less than) operator in NoSQL queries",
         "detail": "src.patterns.NoSQL_Injection",
         "documentation": {}
     },
@@ -671,6 +734,24 @@
     {
         "label": "patterns",
         "kind": 5,
+        "importPath": "src.patterns.Race_Condition",
+        "description": "src.patterns.Race_Condition",
+        "peekOfCode": "patterns = [\n    # Placeholder: Look for common race condition indicators (e.g., time-of-check to time-of-use bugs)\n    r'os\\.access\\s*\\(.*\\)\\s*;?\\s*open\\s*\\(',\n    r'flock\\s*\\(',\n    # Add more specific patterns as needed\n]",
+        "detail": "src.patterns.Race_Condition",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
+        "importPath": "src.patterns.Reflected_File_Download",
+        "description": "src.patterns.Reflected_File_Download",
+        "peekOfCode": "patterns = [\n    # Look for user input reflected in file download responses\n    r'Content-Disposition.*filename.*\\+.*request',\n    r'response\\.headers\\s*\\[.*filename.*\\]\\s*=\\s*.*request',\n]",
+        "detail": "src.patterns.Reflected_File_Download",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
         "importPath": "src.patterns.SQL_Injection",
         "description": "src.patterns.SQL_Injection",
         "peekOfCode": "patterns = [\n    # Classic SQLi in PHP, Python, Java, Node, Ruby, Go, etc.\n    r'(?i)(?:execute|exec)\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)SELECT\\s+.*\\s+FROM\\s+.*\\s+WHERE\\s+.*=\\s*[\\'\\\"]+.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)INSERT\\s+INTO\\s+.*\\s+VALUES\\s*\\(.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)UPDATE\\s+.*\\s+SET\\s+.*=.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)DELETE\\s+FROM\\s+.*\\s+WHERE\\s+.*=.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)(?:mysql|mysqli|pdo)_query\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)(?:query|prepare)\\(\\s*[\"\\'](?:SELECT|INSERT|UPDATE|DELETE).*$',\n    r'(?i)\\.executeQuery\\(\\s*[\"\\'](?:SELECT|INSERT|UPDATE|DELETE).*[+]',",
@@ -682,7 +763,7 @@
         "kind": 5,
         "importPath": "src.patterns.SSRF_Vulnerabilities",
         "description": "src.patterns.SSRF_Vulnerabilities",
-        "peekOfCode": "patterns = [\n    r'(?i)(?:axios|fetch|http|request|got|superagent|curl_exec)\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)new\\s+URL\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.get\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.post\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.send\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.open\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    # Expanded patterns for more SSRF detection\n    r'(?i)urllib\\.request\\.urlopen\\s*\\(\\s*.*\\)',  # Python\n    r'(?i)requests\\.(get|post|put|delete|head|options|patch)\\s*\\(\\s*.*\\)',  # Python",
+        "peekOfCode": "patterns = [\n    r'(?i)(?:axios|fetch|http|request|got|superagent|curl_exec)\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',  # HTTP client with user input\n    r'(?i)new\\s+URL\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',  # JS URL() with user input\n    r'(?i)\\.get\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',  # .get() with user input\n    r'(?i)\\.post\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',  # .post() with user input\n    r'(?i)\\.send\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',  # .send() with user input\n    r'(?i)\\.open\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',  # .open() with user input\n    # Expanded patterns for more SSRF detection\n    r'(?i)urllib\\.request\\.urlopen\\s*\\(\\s*.*\\)',  # Python urllib urlopen\n    r'(?i)requests\\.(get|post|put|delete|head|options|patch)\\s*\\(\\s*.*\\)',  # Python requests",
         "detail": "src.patterns.SSRF_Vulnerabilities",
         "documentation": {}
     },
@@ -691,7 +772,7 @@
         "kind": 5,
         "importPath": "src.patterns.Sensitive_Data_Exposure",
         "description": "src.patterns.Sensitive_Data_Exposure",
-        "peekOfCode": "patterns = [\n    # Private keys and certificates\n    r'(?i)BEGIN PRIVATE KEY',\n    r'(?i)BEGIN RSA PRIVATE KEY',\n    r'(?i)BEGIN DSA PRIVATE KEY',\n    r'(?i)BEGIN EC PRIVATE KEY',\n    r'(?i)BEGIN OPENSSH PRIVATE KEY',\n    r'(?i)BEGIN ENCRYPTED PRIVATE KEY',\n    r'(?i)BEGIN CERTIFICATE',\n    r'(?i)BEGIN PGP PRIVATE KEY BLOCK',",
+        "peekOfCode": "patterns = [\n    # TLDR: Detects PEM private key blocks\n    r'(?i)BEGIN PRIVATE KEY',\n    # TLDR: Detects PEM RSA private key blocks\n    r'(?i)BEGIN RSA PRIVATE KEY',\n    # TLDR: Detects PEM DSA private key blocks\n    r'(?i)BEGIN DSA PRIVATE KEY',\n    # TLDR: Detects PEM EC private key blocks\n    r'(?i)BEGIN EC PRIVATE KEY',\n    # TLDR: Detects OpenSSH private key blocks",
         "detail": "src.patterns.Sensitive_Data_Exposure",
         "documentation": {}
     },
@@ -702,6 +783,15 @@
         "description": "src.patterns.Server_Side_Template_Injection",
         "peekOfCode": "patterns = [\n    r'(?i)\\{\\{.*\\}\\}',\n    r'(?i)\\{%.*%\\}',\n    r'(?i)\\$\\{.*\\}',\n    r'(?i)<%.*%>',\n    r'(?i)\\bjinja2\\b',\n    r'(?i)\\btwig\\b',\n    r'(?i)\\berb\\b',\n    r'(?i)\\btemplate\\b',\n]",
         "detail": "src.patterns.Server_Side_Template_Injection",
+        "documentation": {}
+    },
+    {
+        "label": "patterns",
+        "kind": 5,
+        "importPath": "src.patterns.Session_Fixation",
+        "description": "src.patterns.Session_Fixation",
+        "peekOfCode": "patterns = [\n    # Look for session id settable by user\n    r'session_id\\s*=\\s*request', # session_id from user input\n    r'session\\.set\\s*\\(', # session.set() call\n    r'Set-Cookie:\\s*PHPSESSID=', # Set-Cookie PHPSESSID\n]",
+        "detail": "src.patterns.Session_Fixation",
         "documentation": {}
     },
     {
@@ -763,7 +853,7 @@
         "kind": 5,
         "importPath": "src.patterns.XSS",
         "description": "src.patterns.XSS",
-        "peekOfCode": "patterns = [\n    r'(?i)document\\.write\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.innerHTML\\s*=\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.outerHTML\\s*=\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)eval\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)setTimeout\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)setInterval\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)new\\s+Function\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)\\.innerText\\s*=\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)',\n    r'(?i)document\\.body\\.appendChild\\(.*\\$_(?:GET|POST|REQUEST|COOKIE)',",
+        "peekOfCode": "patterns = [\n    r'(?i)document\\.write\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS document.write with user input\n    r'(?i)\\.innerHTML\\s*=\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS innerHTML with user input\n    r'(?i)\\.outerHTML\\s*=\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS outerHTML with user input\n    r'(?i)eval\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS eval with user input\n    r'(?i)setTimeout\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS setTimeout with user input\n    r'(?i)setInterval\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS setInterval with user input\n    r'(?i)new\\s+Function\\s*\\(\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS Function() with user input\n    r'(?i)\\.innerText\\s*=\\s*.*\\$_(?:GET|POST|REQUEST|COOKIE)', # JS innerText with user input\n    r'(?i)document\\.body\\.appendChild\\(.*\\$_(?:GET|POST|REQUEST|COOKIE)', # appendChild with user input",
         "detail": "src.patterns.XSS",
         "documentation": {}
     },
