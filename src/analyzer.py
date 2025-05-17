@@ -4,6 +4,37 @@ import re
 import logging
 import json
 from collections import defaultdict
+from patterns.Insecure_Configuration import patterns as insecure_config_patterns
+from patterns.CSRF_Vulnerabilities import patterns as csrf_vulnerabilities_patterns
+from patterns.SQL_Injection import patterns as sql_injection_patterns
+from patterns.XSS import patterns as xss_patterns
+from patterns.Command_Injection import patterns as command_injection_patterns
+from patterns.File_Inclusion import patterns as file_inclusion_patterns
+from patterns.Insecure_Crypto import patterns as insecure_crypto_patterns
+from patterns.Hardcoded_Credentials import patterns as hardcoded_credentials_patterns
+from patterns.Information_Disclosure import patterns as information_disclosure_patterns
+from patterns.SSRF_Vulnerabilities import patterns as ssrf_vulnerabilities_patterns
+from patterns.XXE_Vulnerabilities import patterns as xxe_vulnerabilities_patterns
+from patterns.Open_Redirect import patterns as open_redirect_patterns
+from patterns.JWT_Issues import patterns as jwt_issues_patterns
+from patterns.Deserialization import patterns as deserialization_patterns
+from patterns.LDAP_Injection import patterns as ldap_injection_patterns
+from patterns.NoSQL_Injection import patterns as NoSQL_injection_patterns
+from patterns.Prototype_Pollution import patterns as prototype_pollution_patterns
+from patterns.Insecure_Randomness import patterns as insecure_randomness_patterns
+from patterns.Path_Traversal import patterns as path_traversal_patterns
+from patterns.Unrestricted_File_Upload import patterns as unrestricted_upload_patterns
+from patterns.Software_Library_Versions import patterns as software_library_versions_patterns
+from patterns.Directory_Listing_Enabled import patterns as directory_listing_enabled_patterns
+from patterns.Weak_JWT_Secret import patterns as weak_jwt_secret_patterns
+from patterns.Server_Side_Template_Injection import patterns as ssti_patterns
+from patterns.Unvalidated_Redirects import patterns as unvalidated_redirects_patterns
+from patterns.Sensitive_Data_Exposure import patterns as sensitive_data_exposure_patterns
+from patterns.CORS_Misconfiguration import patterns as cors_misconfiguration_patterns
+from patterns.XML_Injection import patterns as xml_injection_patterns
+from patterns.Insecure_Cookie_Flags import patterns as insecure_cookie_flags_patterns
+from patterns.Use_of_Dangerous_Functions import patterns as use_of_dangerous_functions_patterns
+from patterns.Insecure_HTTP_Headers import patterns as insecure_http_headers_patterns
 
 logger = logging.getLogger('WebScann3r.Analyzer')
 
@@ -13,251 +44,39 @@ class SecurityAnalyzer:
         Initialize the security analyzer
         """
         self.security_patterns = {
-            'SQL Injection': [
-                r'(?i)(?:execute|exec)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)SELECT\s+.*\s+FROM\s+.*\s+WHERE\s+.*=\s*[\'"].*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)INSERT\s+INTO\s+.*\s+VALUES\s*\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)UPDATE\s+.*\s+SET\s+.*=.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)DELETE\s+FROM\s+.*\s+WHERE\s+.*=.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)(?:mysql|mysqli|pdo)_query\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)(?:query|prepare)\(\s*["\'](?:SELECT|INSERT|UPDATE|DELETE).*\$',
-                r'(?i)\.executeQuery\(\s*["\'](?:SELECT|INSERT|UPDATE|DELETE).*\+',
-            ],
-            'XSS': [
-                r'(?i)document\.write\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.innerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.outerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)eval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)setTimeout\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)setInterval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)new\s+Function\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.innerText\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)document\.body\.appendChild\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.insertAdjacentHTML\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'Command Injection': [
-                r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\s*\(\s*.*\+',
-                r'(?i)spawn\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)child_process\.exec\s*\(\s*.*\+',
-                r'(?i)Runtime\.getRuntime\(\)\.exec\(.*\+',
-                r'(?i)ProcessBuilder\(.*\+',
-                r'(?i)os\.system\(.*\+',
-                r'(?i)subprocess\.(?:call|Popen|run)\(.*\+',
-            ],
-            'File Inclusion': [
-                r'(?i)(?:include|require|include_once|require_once)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)fopen\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)file_get_contents\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)readfile\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)new\s+FileReader\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)fs\.readFile\(.*\+',
-                r'(?i)java\.io\.File\(.*\+',
-                r'(?i)open\(.*\+.*,\s*[\'"]r[\'"]\)',
-            ],
-            'Insecure Crypto': [
-                r'(?i)md5\s*\(',
-                r'(?i)sha1\s*\(',
-                r'(?i)crypt\s*\(',
-                r'(?i)CryptoJS\.MD5',
-                r'(?i)CryptoJS\.SHA1',
-                r'(?i)createHash\([\'"]md5[\'"]\)',
-                r'(?i)createHash\([\'"]sha1[\'"]\)',
-                r'(?i)MessageDigest\.getInstance\([\'"]MD5[\'"]\)',
-                r'(?i)MessageDigest\.getInstance\([\'"]SHA-1[\'"]\)',
-                r'(?i)hashlib\.md5\(',
-                r'(?i)hashlib\.sha1\(',
-            ],
-            'Hardcoded Credentials': [
-                r'(?i)(?:password|passwd|pwd|token|secret|api_key|apikey)\s*=\s*[\'"][^\'"]+[\'"]',
-                r'(?i)Authorization:\s*Basic\s+[a-zA-Z0-9+/=]+',
-                r'(?i)Authorization:\s*Bearer\s+[a-zA-Z0-9._~+/=-]+',
-                r'(?i)(?:access_key|access_token|secret_key|api_key|apikey)\s*[=:]\s*[\'"][^\'"]{8,}[\'"]',
-                r'(?i)const\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\s*=\s*[\'"][^\'"]+[\'"]',
-                r'(?i)var\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\s*=\s*[\'"][^\'"]+[\'"]',
-                r'(?i)let\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\s*=\s*[\'"][^\'"]+[\'"]',
-                r'(?i)private\s+(?:final\s+)?String\s+(?:password|passwd|pwd|token|secret|api_key|apikey)\s*=\s*[\'"][^\'"]+[\'"]',
-            ],
-            'Information Disclosure': [
-                r'(?i)console\.log\s*\(',
-                r'(?i)alert\s*\(',
-                r'(?i)print_r\s*\(',
-                r'(?i)var_dump\s*\(',
-                r'(?i)phpinfo\s*\(',
-                r'(?i)<!--\s*DEBUG',
-                r'(?i)//\s*DEBUG',
-                r'(?i)^\s*echo\s+.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.debug\s*\(',
-                r'(?i)System\.out\.print',
-                r'(?i)print\(\s*traceback',
-                r'(?i)\.printStackTrace\(\)',
-            ],
-            'Insecure Configuration': [
-                r'(?i)allow_url_include\s*=\s*On',
-                r'(?i)allow_url_fopen\s*=\s*On',
-                r'(?i)display_errors\s*=\s*On',
-                r'(?i)expose_php\s*=\s*On',
-                r'(?i)disable_functions\s*=\s*',
-                r'(?i)safe_mode\s*=\s*Off',
-                r'(?i)X-XSS-Protection:\s*0',
-                r'(?i)Access-Control-Allow-Origin:\s*\*',
-                r'(?i)helmet.noCache\(\s*false\s*\)',
-                r'(?i)helmet.noSniff\(\s*false\s*\)',
-                r'(?i)helmet.xssFilter\(\s*false\s*\)',
-                r'(?i)secureConnection\s*=\s*false',
-                r'(?i)validateCertificates\s*=\s*false',
-                r'(?i)verify\s*=\s*False',
-            ],
-            'Software/Library Versions': [
-                r'(?i)jquery[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)bootstrap[\.-](\d+\.\d+\.\d+)(?:\.min)?\.(?:js|css)',
-                r'(?i)angular[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)react[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)vue[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)wordpress\/(\d+\.\d+)(?:\.\d+)?',
-                r'(?i)express\/(\d+\.\d+\.\d+)',
-                r'(?i)php(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)python(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)ruby(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)node(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)(?:<!--|\*|//|#)\s*[Pp]owered by\s+([A-Za-z0-9\.-]+)',
-                r'(?i)<meta\s+name=[\'"]generator[\'"]\s+content=[\'"]([^\'"]*)[\'"]\s*\/?>'
-            ],
-            'CSRF Vulnerabilities': [
-                r'(?i)csrf_token\s*=\s*[\'"]\s*[\'"]\s*',
-                r'(?i)anticsrf\s*=\s*[\'"]\s*[\'"]\s*',
-                r'(?i)_csrf\s*=\s*[\'"]\s*[\'"]\s*',
-                r'(?i)<form[^>]*method=[\'"]post[\'"][^>]*>(?:(?!csrf).)*<\/form>',
-                r'(?i)\.setRequestHeader\([\'"]X-CSRF-Token[\'"]\s*,\s*[\'"][\'"]\)',
-                r'(?i)\.setRequestHeader\([\'"]X-CSRF-Token[\'"]\s*,\s*null\)',
-            ],
-            'SSRF Vulnerabilities': [
-                r'(?i)(?:axios|fetch|http|request|got|superagent|curl_exec)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)new\s+URL\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.get\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.post\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.send\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.open\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'XXE Vulnerabilities': [
-                r'(?i)\.setFeature\("http://apache.org/xml/features/disallow-doctype-decl",\s*false\)',
-                r'(?i)\.setFeature\("http://xml.org/sax/features/external-general-entities",\s*true\)',
-                r'(?i)\.setFeature\("http://xml.org/sax/features/external-parameter-entities",\s*true\)',
-                r'(?i)DocumentBuilderFactory\s*.*\.setExpandEntityReferences\(\s*true\s*\)',
-                r'(?i)\.setFeature\(XMLConstants\.FEATURE_SECURE_PROCESSING,\s*false\)',
-                r'(?i)libxml_disable_entity_loader\(\s*false\s*\)',
-            ],
-            'Open Redirect': [
-                r'(?i)(?:window\.location|location\.href|location\.replace|location\.assign|location|(?:<meta[^>]*?refresh[^>]*?content=["\'][^"\']*?url=)|(?:<meta[^>]*?http-equiv=["\']?refresh[^>]*?content=["\'][^"\']*?url=))\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)response\.redirect\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)res\.redirect\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)header\(\s*[\'"]Location:\s*[\'"].*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)sendRedirect\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'Path Traversal': [
-                r'(?i)\.\.\/.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.\.\\\\.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.\.%2F.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.\.%5C.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)%2e%2e%2f.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)%2e%2e%5c.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'JWT Issues': [
-                r'(?i)JWT\.sign\(\s*.*,\s*[\'"]none[\'"]\s*',
-                r'(?i)jwtOptions\s*=\s*{\s*(?:.*,\s*)?[\'"]{0,1}algorithm[\'"]{0,1}\s*:\s*[\'"]{1}none[\'"]{1}',
-                r'(?i)\.verifySignature\(\s*false\s*\)',
-                r'(?i)\.verify\(\s*.*,\s*.*,\s*{\s*(?:.*,\s*)?[\'"]{0,1}algorithms[\'"]{0,1}\s*:\s*\[[^\]]*[\'"]none[\'"]\s*[^\]]*\]',
-            ],
-            'Deserialization': [
-                r'(?i)unserialize\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)ObjectInputStream\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)yaml\.load\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)json_decode\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)Marshal\.load\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)pickle\.loads?\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
+            'SQL Injection': sql_injection_patterns,
+            'XSS': xss_patterns,
+            'Command Injection': command_injection_patterns,
+            'File Inclusion': file_inclusion_patterns,
+            'Insecure Crypto': insecure_crypto_patterns,
+            'Hardcoded Credentials': hardcoded_credentials_patterns,
+            'Information Disclosure': information_disclosure_patterns,
+            'CSRF Vulnerabilities': csrf_vulnerabilities_patterns,
+            'SSRF Vulnerabilities': ssrf_vulnerabilities_patterns,
+            'XXE Vulnerabilities': xxe_vulnerabilities_patterns,
+            'Open Redirect': open_redirect_patterns,
+            'JWT Issues': jwt_issues_patterns,
+            'Deserialization': deserialization_patterns,
+            'LDAP Injection': ldap_injection_patterns,
             # Additional patterns and categories below:
-            'LDAP Injection': [
-                r'(?i)ldapsearch.*[+&|!].*\$',
-                r'(?i)(&(.*=\$.*))',
-            ],
-            'NoSQL Injection': [
-                r'(?i)db\..*\.find\(.*\$.*\)',
-                r'(?i)\$where\s*:\s*["]?.*',
-                r'(?i)\$ne\s*:\s*["]?.*',
-                r'(?i)\$gt\s*:\s*["]?.*',
-                r'(?i)\$lt\s*:\s*["]?.*',
-            ],
-            'Prototype Pollution': [
-                r'(?i)\["\]__proto__\["\]',
-                r'(?i)\["\]constructor\["\]',
-                r'(?i)\["\]prototype\["\]',
-            ],
-            'Insecure Randomness': [
-                r'(?i)Math\.random\(',
-                r'(?i)random\.random\(',
-                r'(?i)rand\(',
-                r'(?i)srand\(',
-            ],
-            'Weak JWT Secret': [
-                r'(?i)jwt\.sign\(.*[\'\"]{1,8}[\'\"]',
-            ],
-            'Unrestricted File Upload': [
-                r'(?i)multipart/form-data',
-                r'(?i)Content-Disposition: form-data; name=[\'\"]?file[\'\"]?',
-                r'(?i)upload\s*\(',
-            ],
-            'Directory Listing Enabled': [
-                r'(?i)Index of /',
-                r'(?i)Directory listing for /',
-            ],
-            'Server-Side Template Injection (SSTI)': [
-                r'(?i)\{\{.*\}\}',
-                r'(?i)\{%.*%\}',
-                r'(?i)\$\{.*\}',
-                r'(?i)<%.*%>',
-            ],
-            'Unvalidated Redirects': [
-                r'(?i)window\.location\s*=\s*.*',
-                r'(?i)header\(\s*[\'\"]Location:.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'Sensitive Data Exposure': [
-                r'(?i)private_key',
-                r'(?i)BEGIN PRIVATE KEY',
-                r'(?i)BEGIN RSA PRIVATE KEY',
-                r'(?i)BEGIN DSA PRIVATE KEY',
-                r'(?i)BEGIN EC PRIVATE KEY',
-                r'(?i)BEGIN OPENSSH PRIVATE KEY',
-                r'(?i)BEGIN ENCRYPTED PRIVATE KEY',
-                r'(?i)password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
-            ],
-            'CORS Misconfiguration': [
-                r'(?i)Access-Control-Allow-Origin:\s*\*',
-                r'(?i)Access-Control-Allow-Credentials:\s*true',
-            ],
-            'XML Injection': [
-                r'(?i)<\?xml.*\?>',
-                r'(?i)<!DOCTYPE.*>',
-            ],
-            'Insecure HTTP Headers': [
-                r'(?i)X-Frame-Options:\s*ALLOWALL',
-                r'(?i)X-Content-Type-Options:\s*none',
-                r'(?i)Strict-Transport-Security:\s*',
-            ],
-            'Use of Dangerous Functions': [
-                r'(?i)eval\(',
-                r'(?i)exec\(',
-                r'(?i)system\(',
-                r'(?i)popen\(',
-                r'(?i)passthru\(',
-                r'(?i)proc_open\(',
-                r'(?i)assert\(',
-                r'(?i)base64_decode\(',
-                r'(?i)unserialize\(',
-            ],
-            'Insecure Cookie Flags': [
-                r'(?i)Set-Cookie:.*(HttpOnly|Secure)',
-            ],
+            'NoSQL Injection': NoSQL_injection_patterns,
+            'Prototype Pollution': prototype_pollution_patterns,
+            'Insecure Randomness': insecure_randomness_patterns,
+            'Path Traversal': path_traversal_patterns,
+            'Weak JWT Secret': weak_jwt_secret_patterns,
+            'Software/Library Versions': software_library_versions_patterns,
+            'Directory Listing Enabled': directory_listing_enabled_patterns,
+            'Server-Side Template Injection (SSTI)': ssti_patterns,
+            'Insecure Configuration': insecure_config_patterns,
+            'Unrestricted File Upload': unrestricted_upload_patterns,
+            'Directory Listing Enabled': directory_listing_enabled_patterns,
+            'Unvalidated Redirects': unvalidated_redirects_patterns,
+            'Sensitive Data Exposure': sensitive_data_exposure_patterns,
+            'CORS Misconfiguration': cors_misconfiguration_patterns,
+            'Insecure HTTP Headers': insecure_http_headers_patterns,
+            'XML Injection': xml_injection_patterns,
+            'Insecure Cookie Flags': insecure_cookie_flags_patterns,
+            'Use of Dangerous Functions': use_of_dangerous_functions_patterns,
         }
         
         # Mapping security issues to OWASP Top 10 Categories
@@ -301,7 +120,7 @@ class SecurityAnalyzer:
         
         # Descriptions for each vulnerability type
         self.vulnerability_descriptions = {
-            'SQL Injection': 'SQL injection occurs when untrusted data is sent to an interpreter as part of a command or query. The attacker's hostile data can trick the interpreter into executing unintended commands or accessing data without proper authorization.',
+            'SQL Injection': 'SQL injection occurs when untrusted data is sent to an interpreter as part of a command or query. The attacker\'s hostile data can trick the interpreter into executing unintended commands or accessing data without proper authorization.',
             'XSS': 'Cross-Site Scripting (XSS) attacks are a type of injection, in which malicious scripts are injected into otherwise benign and trusted websites. XSS attacks occur when an attacker uses a web application to send malicious code, generally in the form of a browser side script, to a different end user.',
             'Command Injection': 'Command injection is an attack in which the goal is execution of arbitrary commands on the host operating system via a vulnerable application. Command injection attacks are possible when an application passes unsafe user supplied data to a system shell.',
             'File Inclusion': 'File inclusion vulnerabilities allow an attacker to include a file, usually exploiting a "dynamic file inclusion" mechanisms implemented in the target application. The vulnerability occurs due to the use of user-supplied input without proper validation.',
