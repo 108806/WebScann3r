@@ -27,6 +27,17 @@ A comprehensive web reconnaissance tool for red team assessments. This tool scan
 - **JSON Data Exports**: Provides structured JSON files for integration with other tools
 - **JSON Dump**: Creates a structured JSON file with all discovered files and directories
 - **Target Organization**: Organizes all outputs by target site in a structured directory layout
+- **Automatic Code Beautification**: All downloaded `.js`, `.html`, and `.css` files are automatically beautified/pretty-printed before analysis and reporting, making security findings easier to review and learn from.
+- **Comprehensive Pattern Documentation**: All vulnerability patterns are now well-documented, with clear descriptions, risk levels, OWASP categories, and mitigation guidance for educational value.
+- **Improved URL Handling**: URLs missing a scheme (http/https) are now auto-corrected and a warning is shown in the CLI.
+- **Better Error Reporting**: Improved error and warning messages for file handling and BeautifulSoup parsing.
+- **Robustness**: Type checks and error handling improved for HTML parsing and code analysis.
+
+## Changelog (Recent Major Improvements)
+
+- Beautified code is now used for all analysis and reporting (not just saved to disk).
+- Security pattern coverage and documentation improved for all major vulnerability types.
+- CLI and reporting usability enhancements.
 
 ## Installation
 

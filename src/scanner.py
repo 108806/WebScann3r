@@ -348,6 +348,26 @@ class WebScanner:
                     logger.error(f"Error saving {url} to {file_path} after {max_retries} retries: {e}")
                     return
     
+    def format_code_file(self, file_path, extension):
+        """
+        Format code files using jsbeautifier for JS, HTML, and CSS.
+        """
+        try:
+            import jsbeautifier
+            if extension in ['.js', '.html', '.css']:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                opts = jsbeautifier.default_options()
+                opts.indent_size = 2
+                formatted = jsbeautifier.beautify(content, opts)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(formatted)
+            elif extension == '.php':
+                # Optionally, add PHP formatting if a Python solution is found
+                pass
+        except Exception as e:
+            logger.warning(f"Could not format {file_path}: {e}")
+
     def save_and_store_code(self, url, content, file_path):
         """
         Save code file and store it for later analysis
@@ -359,10 +379,21 @@ class WebScanner:
         """
         # Save the file
         self.save_file(url, content, file_path)
+        # Format the file if it's .js, .php, .html, or .css
+        extension = os.path.splitext(file_path)[1].lower()
+        if extension in ['.js', '.php', '.html', '.css']:
+            self.format_code_file(file_path, extension)
         
         # Store the code for analysis
         rel_path = os.path.relpath(file_path, self.download_dir)
-        self.code_files[rel_path] = content
+        # Try to read the beautified file
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                beautified_content = f.read()
+            self.code_files[rel_path] = beautified_content
+        except Exception as e:
+            logger.warning(f"Could not read beautified file {file_path}: {e}")
+            self.code_files[rel_path] = content
     
     def extract_urls(self, base_url, html_content):
         """
@@ -939,7 +970,7 @@ class WebScanner:
                 r'(?i)endpoint\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
                 r'(?i)url\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+/api/[\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
                 r'(?i)fetch\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)axios\.(?:get|post|put|delete|patch|request)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
+                r'(?i)axios\.(?:get|post|put|delete|patch)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
                 r'(?i)superagent\.(?:get|post|put|delete|patch)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
                 r'(?i)ky\.(?:get|post|put|delete|patch)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
                 r'(?i)\.ajax\s*\(\s*\{\s*url\s*:\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
@@ -1034,7 +1065,7 @@ class WebScanner:
             }
 
             # Sort sinks by score descending
-            sorted_sinks = sorted(self.potential_sinks, key=lambda s: get_sink_score(s['sink']), reverse=True)
+            sorted_sinks = sorted(self.potential_sinks, key=lambda s: self.get_sink_score(s['sink']), reverse=True)
 
             sinks_report_path = os.path.join(self.report_dir, 'sinks.md')
             with open(sinks_report_path, 'w', encoding='utf-8') as f:
@@ -1047,7 +1078,7 @@ class WebScanner:
                     line = sink['line']
                     sink_type = sink['sink'].split('(')[0].strip().replace('.', '')
                     regex = sink['sink']
-                    score = get_sink_score(sink['sink'])
+                    score = self.get_sink_score(sink['sink'])
                     f.write(f"| `{file}` | {line} | `{sink_type}` | `{regex}` | **{score}** |\n")
                 f.write("\n---\n\n")
                 f.write("**Legend:** Higher score = more dangerous sink.\n\n")
@@ -1060,6 +1091,42 @@ class WebScanner:
         
         # Generate function usage report
         self.generate_function_usage_report()
+    
+    def get_sink_score(self, sink_name):
+        """
+        Return the score for a given sink name based on the sink_score_map.
+        """
+        sink_score_map = {
+            'eval': 10, 'exec': 10, 'system': 10, 'popen': 8, 'passthru': 8, 'proc_open': 8, 'assert': 7,
+            'base64_decode': 6, 'unserialize': 9, 'Function': 8, 'setTimeout': 5, 'setInterval': 5,
+            'child_process.exec': 9, 'os.system': 9, 'subprocess': 8, 'input': 6, 'pickle.loads': 9,
+            'open': 5, 'require': 6, 'include': 6, 'fetch': 5, 'axios': 5, 'ajax': 5,
+            'new Function': 8, 'window.Function': 8, 'window.eval': 10, 'document.write': 8, 'document.writeln': 8,
+            'innerHTML': 7, 'outerHTML': 7, 'dangerouslySetInnerHTML': 8, 'document.execCommand': 7,
+            'fopen': 6, 'file_get_contents': 6, 'readfile': 6, 'file_put_contents': 6, 'fs.readFile': 6, 'fs.writeFile': 6,
+            'fs.appendFile': 6, 'fs.createWriteStream': 6, 'fs.createReadStream': 6, 'fs.unlink': 6, 'fs.rmdir': 6,
+            'pickle.load': 9, 'pickle.loads': 9, 'yaml.load': 8, 'marshal.loads': 8, 'unmarshal': 8, 'ObjectInputStream': 8,
+            'XMLHttpRequest': 5, 'http.request': 5, 'https.request': 5, 'requests.get': 5, 'requests.post': 5,
+            'urllib.request': 5, 'curl_exec': 6, 'curl_setopt': 6, 'curl_init': 6, 'socket': 6, 'netcat': 7,
+            'render': 7, 'render_template': 7, 'twig.render': 7, 'ejs.render': 7, 'mustache.render': 7,
+            'mysql_query': 8, 'mysqli_query': 8, 'pdo_query': 8, 'pg_query': 8, 'sqlite_query': 8, 'db.query': 8,
+            'os.popen': 8, 'os.spawn': 8, 'os.exec': 10, 'os.execl': 10, 'os.execle': 10, 'os.execlp': 10, 'os.execlpe': 10,
+            'os.execv': 10, 'os.execve': 10, 'os.execvp': 10, 'os.execvpe': 10, 'os.fork': 8, 'os.forkpty': 8,
+            'os.kill': 7, 'os.killpg': 7, 'os.startfile': 7, 'os.system': 9, 'subprocess.Popen': 8, 'subprocess.call': 8,
+            'subprocess.run': 8, 'subprocess.check_call': 8, 'subprocess.check_output': 8,
+            'document.location': 7, 'window.location': 7, 'location.href': 7, 'location.replace': 7, 'location.assign': 7,
+            'window.open': 6, 'window.postMessage': 6, 'document.cookie': 6, 'localStorage.setItem': 6, 'sessionStorage.setItem': 6,
+            'shell_exec': 8, 'create_function': 8, 'preg_replace': 7, 'move_uploaded_file': 7, 'parse_str': 7,
+            'Runtime.getRuntime().exec': 10, 'ProcessBuilder': 8, 'ObjectInputStream.readObject': 8,
+            'Process.Start': 8, 'Assembly.Load': 8, 'AppDomain.CreateDomain': 7, 'Type.GetType': 7,
+            'eval_r': 10, 'execfile': 9, 'compile': 8, 'exec_module': 8, 'importlib.import_module': 7,
+            'dangerous_function': 10, 'dangerous_eval': 10, 'dangerous_exec': 10
+        }
+        # Try to match the sink name to a key in the map
+        for key in sink_score_map:
+            if key in sink_name:
+                return sink_score_map[key]
+        return 5  # Default score if not found
     
     def generate_function_usage_report(self):
         """
