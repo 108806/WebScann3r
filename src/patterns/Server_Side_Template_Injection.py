@@ -1,4 +1,5 @@
-patterns = [
+# Patterns for Server-Side Template Injection (SSTI) (expanded and well-commented)
+ssti_patterns = [
     r'(?i)\{\{.*\}\}',
     r'(?i)\{%.*%\}',
     r'(?i)\$\{.*\}',

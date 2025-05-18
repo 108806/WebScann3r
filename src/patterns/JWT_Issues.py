@@ -1,5 +1,5 @@
-# All patterns for JWT Issues
-patterns = [
+# Patterns for JWT Issues (expanded and well-commented)
+jwt_issues_patterns = [
     r'(?i)JWT\.sign\(\s*.*,\s*[\'"]none[\'"]\s*',
     r'(?i)jwtOptions\s*=\s*{\s*(?:.*,\s*)?[\'"]{0,1}algorithm[\'"]{0,1}\s*:\s*[\'"]{1}none[\'"]{1}',
     r'(?i)\.verifySignature\(\s*false\s*\)',

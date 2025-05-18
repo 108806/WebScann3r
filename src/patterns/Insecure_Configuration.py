@@ -1,5 +1,5 @@
-# All patterns for Insecure Configuration
-patterns = [
+# Patterns for Insecure Configuration (expanded and well-commented)
+insecure_config_patterns = [
     r'(?i)allow_url_include\s*=\s*On', # PHP allow_url_include On
     r'(?i)allow_url_fopen\s*=\s*On', # PHP allow_url_fopen On
     r'(?i)display_errors\s*=\s*On', # PHP display_errors On

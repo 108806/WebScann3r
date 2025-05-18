@@ -138,6 +138,7 @@ class Reporter:
             json.dump(files_dirs, f, indent=4)
         
         logger.info(f"Files and directories JSON dump generated: {json_path}")
+        print(f"[SUMMARY] Discovered files/dirs: {len(downloaded_files)} files, {len(files_dirs['directories'])} directories")
         return json_path
         
     def generate_security_report(self, security_findings, pattern_map=None):
@@ -178,11 +179,22 @@ class Reporter:
                 f.write("No security issues found.\n")
             else:
                 f.write("## Security Issues Found\n\n")
-                issue_count = sum(len(issues) for file_issues in security_findings.values() for issues in file_issues.values())
+                # Only count issues that are lists, skip summary/stat keys
+                issue_count = sum(
+                    len(issues)
+                    for file_issues in security_findings.values()
+                    if isinstance(file_issues, dict)
+                    for issues in file_issues.values()
+                    if isinstance(issues, list)
+                )
                 f.write(f"Total issues found: {issue_count}\n\n")
                 issue_num = 1
                 for file_path, file_findings in security_findings.items():
+                    if not isinstance(file_findings, dict):
+                        continue
                     for issue_type, matches in file_findings.items():
+                        if not isinstance(matches, list):
+                            continue
                         for match in matches:
                             # Find the exact regex pattern that matched, if pattern_map is provided
                             pattern_str = None
@@ -202,12 +214,14 @@ class Reporter:
                             if pattern_str:
                                 f.write(f"**Pattern:**\n```\n{pattern_str}\n```\n\n")
                             else:
-                                f.write("**Pattern:** _Pattern not available_\n\n")
+                                # Show the actual match string if pattern is not available
+                                f.write(f"**Pattern:** _Pattern not available (matched: {match.get('match', 'N/A')})_\n\n")
                             snippet = highlight_match(match['code'], match['match'])
                             f.write(f"**Code:**\n```\n{snippet}\n```\n")
                             f.write("==================================================\n\n")
                             issue_num += 1
         logger.info(f"Security report generated: {report_path}")
+        print(f"[SUMMARY] Security report issues: {issue_count}")
         return report_path
     
     def generate_function_usage_report(self, function_calls):
@@ -401,6 +415,9 @@ class Reporter:
             f.write("3. Consider conducting more targeted security tests based on the findings.\n")
         
         logger.info(f"Final report generated: {report_path}")
+        # Print discovered versions summary
+        detected_versions = scan_info.get('detected_versions', {})
+        print(f"[SUMMARY] Discovered software versions: {len(detected_versions)}")
         return report_path
     
     def save_json_data(self, data, filename):
@@ -546,4 +563,5 @@ class Reporter:
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(sensitive_data, f, indent=4)
         logger.info(f"Sensitive data JSON dump generated: {json_path}")
+        print(f"[SUMMARY] Sensitive data: {sum(len(v) for v in crypto_addresses.values())} crypto addresses, {len(phone_counts)} phone numbers, {len(ip_counts)} IPs, {len(internal_links)} internal, {len(external_links)} external links")
         return json_path

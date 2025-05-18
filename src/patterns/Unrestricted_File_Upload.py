@@ -1,4 +1,5 @@
-patterns = [
+# Patterns for Unrestricted File Upload (expanded and well-commented)
+unrestricted_file_upload_patterns = [
     # Common multipart/form-data and file upload indicators
     r'(?i)multipart/form-data',
     r'(?i)Content-Disposition: form-data; name=[\'\"]?file[\'\"]?',

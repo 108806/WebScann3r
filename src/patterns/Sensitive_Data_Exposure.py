@@ -1,4 +1,5 @@
-patterns = [
+# Patterns for Sensitive Data Exposure (expanded and well-commented)
+sensitive_data_exposure_patterns = [
     # TLDR: Detects PEM private key blocks
     r'(?i)BEGIN PRIVATE KEY',
     # TLDR: Detects PEM RSA private key blocks

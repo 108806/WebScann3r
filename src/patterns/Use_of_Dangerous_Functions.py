@@ -1,4 +1,5 @@
-patterns = [
+# Patterns for Use of Dangerous Functions (expanded and well-commented)
+use_of_dangerous_functions_patterns = [
     # Python
     r'(?i)eval\(',
     r'(?i)exec\(',
@@ -64,12 +65,12 @@ patterns = [
     r'(?i)move_uploaded_file\(',
     # JavaScript/Node.js
     r'(?i)eval\(',
-    r'(?i)Function\(',
+    # r'(?i)Function\(', # Commented: too broad, causes false positives on common function usage
     r'(?i)setTimeout\(',
     r'(?i)setInterval\(',
     r'(?i)document\.write\(',
     r'(?i)document\.writeln\(',
-    r'(?i)innerHTML\s*=',
+    # r'(?i)innerHTML\s*=', # Commented: too broad, causes false positives on any assignment to innerHTML
     r'(?i)outerHTML\s*=',
     r'(?i)window\.execScript\(',
     r'(?i)window\.setTimeout\(',
@@ -79,7 +80,7 @@ patterns = [
     r'(?i)child_process\.spawn\(',
     r'(?i)child_process\.spawnSync\(',
     r'(?i)child_process\.fork\(',
-    r'(?i)require\s*\(\s*["\']child_process["\']\s*\)'
+    r'(?i)require\s*\(\s*["\']child_process["\']\s*\)',
     r'(?i)dangerouslySetInnerHTML',
     # Java
     r'(?i)Runtime\.getRuntime\(\)\.exec\(',
@@ -104,16 +105,16 @@ patterns = [
     r'(?i)Kernel\.exec\s*\(',
     r'(?i)Kernel\.open\s*\(',
     # C/C++
-    r'(?i)system\\s*\\(',
-    r'(?i)popen\\s*\\(',
-    r'(?i)execv\\s*\\(',
-    r'(?i)execvp\\s*\\(',
-    r'(?i)execl\\s*\\(',
-    r'(?i)execlp\\s*\\(',
-    r'(?i)fork\\s*\\(',
-    r'(?i)dlopen\\s*\\(',
-    r'(?i)LoadLibrary\\s*\\(',
-    r'(?i)GetProcAddress\\s*\\(',
+    r'(?i)system\s*\(',
+    r'(?i)popen\s*\(',
+    r'(?i)execv\s*\(',
+    r'(?i)execvp\s*\(',
+    r'(?i)execl\s*\(',
+    r'(?i)execlp\s*\(',
+    r'(?i)fork\s*\(',
+    r'(?i)dlopen\s*\(',
+    r'(?i)LoadLibrary\s*\(',
+    r'(?i)GetProcAddress\s*\(',
     # Misc
     r'(?i)dangerouslyAllowAnyOrigin',
     r'(?i)dangerouslyAllowAnyMethod',

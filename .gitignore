@@ -23,6 +23,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.vscode 
 
 # PyInstaller
 *.manifest
@@ -102,4 +103,7 @@ ENV/
 /reports/
 webscann3r.log
 old
+
+# VSCode settings
+.vscode/
 

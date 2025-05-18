@@ -7,7 +7,7 @@ import os
 from src.scanner import WebScanner
 
 def main():
-    banner = """
+    banner = r"""
  __        __   _     ____                       _____      
  \ \      / /__| |__ / ___|  ___ __ _ _ __  _ __|___ / _ __ 
   \ \ /\ / / _ \ '_ \\___ \ / __/ _` | '_ \| '_ \ |_ \| '__|
@@ -38,6 +38,11 @@ def main():
     parser.add_argument("-q", "--quiet", help="Suppress all output except errors", action="store_true")
     
     args = parser.parse_args()
+
+    # Auto-correct and warn if URL does not start with http/https
+    if not args.url.startswith(('http://', 'https://')):
+        print(f"[WARNING] Target address '{args.url}' does not start with http:// or https://. Assuming https://{args.url}")
+        args.url = 'https://' + args.url
     
     # Configure logging based on verbosity
     if args.quiet:

@@ -1,5 +1,5 @@
 # All patterns for CSRF Vulnerabilities
-patterns = [
+csrf_vulnerabilities_patterns = [
     r'(?i)csrf_token\s*=\s*[\'"]\s*[\'"]\s*',
     r'(?i)anticsrf\s*=\s*[\'"]\s*[\'"]\s*',
     r'(?i)_csrf\s*=\s*[\'"]\s*[\'"]\s*',

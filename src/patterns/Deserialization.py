@@ -1,5 +1,5 @@
-# All patterns for Deserialization
-patterns = [
+# Patterns for Deserialization (expanded and well-commented)
+deserialization_patterns = [
     # TLDR: Detects PHP unserialize() with user input (dangerous deserialization)
     r'(?i)unserialize\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
     # TLDR: Detects Java ObjectInputStream with user input

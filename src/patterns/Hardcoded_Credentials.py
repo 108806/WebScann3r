@@ -1,5 +1,5 @@
-# All patterns for Hardcoded Credentials
-patterns = [
+# Patterns for Hardcoded Credentials (expanded and well-commented)
+hardcoded_credentials_patterns = [
     r'(?i)(?:password|passwd|pwd|token|secret|api_key|apikey)\s*=\s*[\'\"][^\'\"]+[\'\"]', # Generic hardcoded secrets
     r'(?i)Authorization:\s*Basic\s+[a-zA-Z0-9+/=]+', # Basic Auth header
     r'(?i)Authorization:\s*Bearer\s+[a-zA-Z0-9._~+/=-]+', # Bearer Auth header

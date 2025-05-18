@@ -159,6 +159,37 @@ targets/
 
 This structure ensures each scan is isolated and timestamped for better organization.
 
+## Expected Behavior and Reporting Logic
+
+WebScann3r is designed to help both red teamers and defenders by distinguishing between *potential* attack surfaces (sinks) and *actual* vulnerabilities. This section clarifies what you should expect in the reports:
+
+### Sinks vs. Vulnerabilities
+
+- **Sinks** (in `sinks.md`):
+  - These are code locations where dangerous functions (like `exec`, `eval`, `system`, etc.) are called, regardless of what input is used.
+  - Sinks are *not* always vulnerabilities. They are places a red teamer should consider for fuzzing or further review.
+  - Example: `exec($foo)` will be listed as a sink, even if `$foo` is not user-controlled.
+
+- **Vulnerabilities** (in `security_report.md`):
+  - Only code patterns that match known dangerous usage (e.g., user input passed to `exec`, like `exec($_GET['cmd'])`) are reported as vulnerabilities.
+  - These are the issues that are most likely to be exploitable without further manual investigation.
+
+### Why is this distinction important?
+- Not every use of a dangerous function is a vulnerability. Many are safe, or only dangerous if user input is involved.
+- Reporting every sink as a vulnerability would create too much noise and lead to false positives.
+- This approach helps you focus on real issues, while still giving you the option to review all potentially risky code.
+
+### Typical Report Example
+- You may see many `exec` or `eval` calls in `sinks.md`, but only a few (or none) in `security_report.md`.
+- This is expected and correct. If you believe a real vulnerability is missed, check the relevant code and consider improving the regex patterns or reporting logic.
+
+### How to Use the Reports
+- **Start with `security_report.md`** to find likely vulnerabilities.
+- **Use `sinks.md`** to guide manual code review, fuzzing, or further dynamic testing.
+- **Review the function usage and endpoint reports** for additional context.
+
+If you are unsure whether a finding is a vulnerability or just a sink, consult this section before opening a bug report.
+
 ## Recommendations for Use
 
 - Start with a basic scan to understand the website structure

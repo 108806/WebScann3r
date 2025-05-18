@@ -1,4 +1,5 @@
-patterns = [
+# Patterns for NoSQL Injection (expanded and well-commented)
+nosql_injection_patterns = [
     # TLDR: Detects MongoDB find() with $-prefixed operator (potential injection)
     r'(?i)db\..*\.find\(.*\$.*\)',
     # TLDR: Detects $where operator in NoSQL queries

@@ -12,7 +12,14 @@ import time
 from pathlib import Path
 from collections import Counter
 from colorama import Fore, Style, init
-from .reporter import Reporter
+from src.reporter import Reporter
+from src.patterns.Dangerous_Sinks import sink_patterns
+from src.patterns.Version_Headers import version_headers
+from src.patterns.Url_Extraction import js_url_patterns, css_url_patterns, html_url_patterns
+from src.patterns.Server_Patterns import server_patterns
+from src.patterns.XPowered_Patterns import xpowered_patterns
+from src.patterns.Api_Endpoint_Patterns import api_endpoint_patterns
+import traceback
 
 # Initialize colorama
 init(autoreset=True)
@@ -45,10 +52,15 @@ logging.basicConfig(
 
 logger = logging.getLogger('WebScann3r')
 
+# Load sink_score_map from JSON file
+sink_score_map_path = os.path.join(os.path.dirname(__file__), 'patterns', 'sink_score_map.json')
+with open(sink_score_map_path, 'r', encoding='utf-8') as f:
+    sink_score_map = json.load(f)
+
 class WebScanner:
     def __init__(self, target_url, download_dir='targets', report_dir='targets', same_domain_only=True, 
                  download_media=False, download_archives=False, download_text=False, threads=10, timeout=30,
-                 max_depth=None):
+                 max_depth=1):  # Set default max_depth to 1
         """
         Initialize the web scanner
         
@@ -62,12 +74,12 @@ class WebScanner:
             download_text (bool): Whether to download text files
             threads (int): Number of threads for concurrent requests
             timeout (int): Request timeout in seconds
-            max_depth (int): Maximum depth to crawl (None for no limit)
+            max_depth (int): Maximum depth to crawl (default 1)
         """
         self.target_url = target_url
         self.base_domain = urlparse(target_url).netloc
         self.same_domain_only = same_domain_only
-        self.max_depth = max_depth
+        self.max_depth = 1 if max_depth is None else max_depth
         self.download_media = download_media
         self.download_archives = download_archives
         self.download_text = download_text
@@ -131,6 +143,11 @@ class WebScanner:
         # Dictionary to store potential sinks
         self.potential_sinks = []
         
+        # Counters for download success/failure
+        self.successful_downloads = 0
+        self.failed_downloads = 0
+        self.failed_files = []
+        
     def start_scan(self):
         """
         Start the scanning process
@@ -163,6 +180,7 @@ class WebScanner:
                     url, current_depth = future_to_url[future]
                     try:
                         new_urls = future.result()
+                        self.successful_downloads += 1
                         # Add new discovered URLs to the queue if they haven't been visited
                         next_depth = current_depth + 1
                         
@@ -174,6 +192,9 @@ class WebScanner:
                                     urls_to_scan.append((new_url, next_depth))
                     except Exception as exc:
                         logger.error(f"Error processing {url}: {exc}")
+                        traceback.print_exc()
+                        self.failed_downloads += 1
+                        self.failed_files.append(url)
         
         # After scanning, analyze the code files
         self.analyze_code_files()
@@ -182,6 +203,13 @@ class WebScanner:
         logger.info(f"Scan completed in {end_time - start_time:.2f} seconds")
         logger.info(f"Visited {len(self.visited_urls)} URLs")
         logger.info(f"Downloaded {len(self.code_files)} code files")
+        
+        # Print download stats
+        print(f"\nDownload phase complete: {self.successful_downloads} files downloaded successfully, {self.failed_downloads} errors.")
+        if self.failed_files:
+            print("Failed files:")
+            for f in self.failed_files:
+                print(f"  - {f}")
         
         # Generate final report
         self.generate_final_report()
@@ -210,19 +238,9 @@ class WebScanner:
             try:
                 response = requests.get(url, headers=self.headers, timeout=self.timeout, allow_redirects=True)
                 
-                # Check for API endpoints
+                # Check for API endpoints using centralized patterns
                 url_path = urlparse(url).path.lower()
-                if (('/api/' in url_path) or 
-                    ('/service/' in url_path) or 
-                    ('/services/' in url_path) or 
-                    ('/v1/' in url_path) or 
-                    ('/v2/' in url_path) or 
-                    ('/v3/' in url_path) or 
-                    ('/graphql' in url_path) or 
-                    ('/rest/' in url_path) or 
-                    url_path.endswith('.json') or 
-                    url_path.endswith('.xml')
-                ):
+                if any(pat in url_path for pat in api_endpoint_patterns):
                     self.api_endpoints.add(url)
 
                 # Extract version information from headers
@@ -280,9 +298,11 @@ class WebScanner:
                     time.sleep(1)  # Wait 1 second before retrying
                 else:
                     logger.error(f"Error processing {url} after {max_retries} retries: {e}")
+                    traceback.print_exc()
                     return []
             except Exception as e:
                 logger.error(f"Error processing {url}: {e}")
+                traceback.print_exc()
                 return []
     
     def get_file_path(self, url):
@@ -310,7 +330,15 @@ class WebScanner:
             domain_dir = parsed_url.netloc.replace(':', '_') + '/'
         
         file_path = os.path.join(self.download_dir, domain_dir, path.lstrip('/'))
-        
+
+        # If the path ends with a slash or has no extension, treat as directory and append index.html
+        if file_path.endswith('/') or not os.path.splitext(file_path)[1]:
+            file_path = os.path.join(file_path, 'index.html')
+        # If the path contains a file segment followed by another segment (e.g. .../beacon.min.js/v123), treat as a versioned file and join as beacon.min.js_v123
+        path_parts = file_path.split(os.sep)
+        if len(path_parts) > 2 and '.' in path_parts[-2] and not '.' in path_parts[-1]:
+            # e.g. .../beacon.min.js/v123 -> .../beacon.min.js_v123
+            file_path = os.sep.join(path_parts[:-2] + [path_parts[-2] + '_' + path_parts[-1]])
         # Create the directory if it doesn't exist
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
@@ -406,12 +434,10 @@ class WebScanner:
         Returns:
             list: List of discovered URLs
         """
+        from bs4 import Tag
         discovered_urls = []
-        
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # Extract URLs from different tags and attributes
             url_patterns = [
                 ('a', 'href'),
                 ('script', 'src'),
@@ -421,58 +447,62 @@ class WebScanner:
                 ('form', 'action'),
                 ('iframe', 'src'),
             ]
-            
             for tag, attr in url_patterns:
                 for element in soup.find_all(tag):
-                    url = element.get(attr)
-                    if url:
-                        absolute_url = urljoin(base_url, url)
-                        if self.should_process_url(absolute_url):
-                            discovered_urls.append(absolute_url)
-            
+                    if isinstance(element, Tag):
+                        url = element.get(attr)
+                        # Only process if url is a string
+                        if isinstance(url, str):
+                            absolute_url = urljoin(base_url, url)
+                            if self.should_process_url(absolute_url):
+                                discovered_urls.append(absolute_url)
+                        # If url is a list (multi-valued attribute), process each string
+                        elif isinstance(url, list):
+                            for u in url:
+                                if isinstance(u, str):
+                                    absolute_url = urljoin(base_url, u)
+                                    if self.should_process_url(absolute_url):
+                                        discovered_urls.append(absolute_url)
             # Extract URLs from JavaScript code
             scripts = soup.find_all('script')
             for script in scripts:
-                if script.string:
+                if isinstance(script, Tag) and script.string:
                     js_urls = self.extract_urls_from_js(base_url, script.string)
                     discovered_urls.extend(js_urls)
-            
             # Extract URLs from inline styles
             styles = soup.find_all('style')
             for style in styles:
-                if style.string:
+                if isinstance(style, Tag) and style.string:
                     css_urls = self.extract_urls_from_css(base_url, style.string)
                     discovered_urls.extend(css_urls)
-                    
-            # Additionally, look for URLs in custom attributes that might contain URLs
+            # Look for URLs in custom attributes
             for element in soup.find_all():
-                for attr in element.attrs:
-                    if attr.lower() not in ['href', 'src', 'action']:
-                        value = element.get(attr)
-                        if isinstance(value, str) and (value.startswith('http') or value.startswith('/')):
-                            absolute_url = urljoin(base_url, value)
-                            if self.should_process_url(absolute_url):
-                                discovered_urls.append(absolute_url)
-        
+                if isinstance(element, Tag):
+                    for attr in element.attrs:
+                        if attr.lower() not in ['href', 'src', 'action']:
+                            value = element.get(attr)
+                            if isinstance(value, str) and (value.startswith('http') or value.startswith('/')):
+                                absolute_url = urljoin(base_url, value)
+                                if self.should_process_url(absolute_url):
+                                    discovered_urls.append(absolute_url)
+                            elif isinstance(value, list):
+                                for v in value:
+                                    if isinstance(v, str) and (v.startswith('http') or v.startswith('/')):
+                                        absolute_url = urljoin(base_url, v)
+                                        if self.should_process_url(absolute_url):
+                                            discovered_urls.append(absolute_url)
         except Exception as e:
             logger.error(f"Error extracting URLs from {base_url}: {e}")
-        
         # Also try to find URLs in JavaScript and CSS content using regex
         js_css_urls = []
-        url_patterns = [
-            r'(https?://[^\s\'"<>()]+)',  # HTTP URLs
-            r'(\/[a-zA-Z0-9_\-\/\.]+\.(?:js|css|php|html|htm))',  # Relative paths with extensions
-        ]
-        
-        for pattern in url_patterns:
+        patterns = html_url_patterns
+        for pattern in patterns:
             for match in re.finditer(pattern, html_content):
                 url = match.group(1)
                 absolute_url = urljoin(base_url, url)
                 if self.should_process_url(absolute_url):
                     js_css_urls.append(absolute_url)
-        
         discovered_urls.extend(js_css_urls)
-        
         # Remove duplicates and return
         return list(set(discovered_urls))
     
@@ -484,22 +514,7 @@ class WebScanner:
             headers (dict): HTTP headers to analyze
         """
         # Headers that might contain version information
-        version_headers = [
-            'Server', 
-            'X-Powered-By', 
-            'X-AspNet-Version', 
-            'X-Generator', 
-            'X-Version',
-            'X-Runtime',
-            'X-AspNetMvc-Version',
-            'X-Drupal-Version',
-            'X-Joomla-Version',
-            'X-Shopify-API-Version',
-            'X-WordPress-Version',
-            'X-Rack-Version',
-            'Liferay-Portal',
-            'Powered-By'
-        ]
+        # (imported from patterns.Version_Headers for consistency and coverage)
         
         # Check each relevant header
         for header in version_headers:
@@ -510,15 +525,7 @@ class WebScanner:
                 
                 # Try to extract more specific version information with regex
                 if header.lower() == 'server':
-                    # Common patterns: Apache/2.4.41 (Ubuntu) or nginx/1.18.0
-                    server_patterns = [
-                        r'apache[\/\s](\d+\.\d+\.\d+)',
-                        r'nginx[\/\s](\d+\.\d+\.\d+)',
-                        r'microsoft-iis[\/\s](\d+\.\d+)',
-                        r'lighttpd[\/\s](\d+\.\d+\.\d+)',
-                        r'caddy[\/\s](\d+\.\d+\.\d+)',
-                    ]
-                    
+                    # Use centralized server_patterns from patterns/Server_Patterns.py
                     for pattern in server_patterns:
                         match = re.search(pattern, value, re.IGNORECASE)
                         if match:
@@ -527,19 +534,12 @@ class WebScanner:
                             self.detected_versions[f"{software.capitalize()} Version"] = version
                 
                 elif header.lower() == 'x-powered-by':
-                    # Common patterns: PHP/7.4.3, ASP.NET
-                    xpowered_patterns = [
-                        r'php[\/\s](\d+\.\d+\.\d+)',
-                        r'asp\.net',
-                        r'express',
-                        r'rails[\/\s](\d+\.\d+\.\d+)',
-                    ]
-                    
+                    # Use centralized xpowered_patterns from patterns/XPowered_Patterns.py
                     for pattern in xpowered_patterns:
                         match = re.search(pattern, value, re.IGNORECASE)
                         if match:
                             technology = pattern.split('[')[0] if '[' in pattern else pattern
-                            technology = technology.replace(r'\.', '.').capitalize()
+                            technology = technology.replace(r'\\.', '.').capitalize()
                             if match.groups():
                                 version = match.group(1)
                                 self.detected_versions[f"{technology} Version"] = version
@@ -563,15 +563,7 @@ class WebScanner:
             return discovered_urls
         
         # Common patterns in JavaScript where URLs might be found
-        patterns = [
-            r'(https?://[^\s\'"<>()]+)',  # HTTP URLs
-            r'[\'"]([\/][^\'"]*\.(js|css|php|html|htm))[\'"]',  # Quoted paths with extensions
-            r'[\'"]([\/][a-zA-Z0-9_\-\/\.]+)[\'"]',  # Quoted paths
-            r'fetch\([\'"]([^\'"]+)[\'"]\)',  # fetch API calls
-            r'xhr\.open\([\'"]GET[\'"], [\'"]([^\'"]+)[\'"]',  # XHR requests
-            r'axios\.get\([\'"]([^\'"]+)[\'"]\)',  # axios requests
-            r'\.ajax\(\{\s*url:\s*[\'"]([^\'"]+)[\'"]',  # jQuery AJAX calls
-        ]
+        patterns = js_url_patterns
         
         for pattern in patterns:
             for match in re.finditer(pattern, js_content):
@@ -602,10 +594,7 @@ class WebScanner:
             return discovered_urls
         
         # Common patterns in CSS where URLs might be found
-        patterns = [
-            r'url\([\'"]?([^\'"<>()]+)[\'"]?\)',  # CSS url() function
-            r'@import\s+[\'"]([^\'"]+)[\'"]',  # CSS @import rule
-        ]
+        patterns = css_url_patterns
         
         for pattern in patterns:
             for match in re.finditer(pattern, css_content):
@@ -698,257 +687,28 @@ class WebScanner:
         Analyze downloaded code files for security issues and function usage
         """
         logger.info("Starting code analysis...")
-        
-        # Security patterns to look for
-        security_patterns = {
-            'SQL Injection': [
-                r'(?i)(?:execute|exec)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)SELECT\s+.*\s+FROM\s+.*\s+WHERE\s+.*=\s*[\'"].*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)INSERT\s+INTO\s+.*\s+VALUES\s*\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)UPDATE\s+.*\s+SET\s+.*=.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)DELETE\s+FROM\s+.*\s+WHERE\s+.*=.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)(?:mysql|mysqli|pdo)_query\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'XSS': [
-                r'(?i)document\.write\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.innerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)\.outerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)eval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)setTimeout\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)setInterval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)new\s+Function\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'Command Injection': [
-                r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\s*\(\s*.*\+',
-                r'(?i)spawn\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)child_process\.exec\s*\(\s*.*\+',
-            ],
-            'File Inclusion': [
-                r'(?i)(?:include|require|include_once|require_once)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)fopen\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)file_get_contents\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-                r'(?i)readfile\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'Insecure Crypto': [
-                r'(?i)md5\s*\(',
-                r'(?i)sha1\s*\(',
-                r'(?i)crypt\s*\(',
-                r'(?i)CryptoJS\.MD5',
-                r'(?i)CryptoJS\.SHA1',
-            ],
-            'Hardcoded Credentials': [
-                r'(?i)(?:password|passwd|pwd|token|secret|api_key|apikey)\s*=\s*[\'"][^\'"]+[\'"]',
-                r'(?i)Authorization:\s*Basic\s+[a-zA-Z0-9+/=]+',
-                r'(?i)Authorization:\s*Bearer\s+[a-zA-Z0-9._~+/=-]+',
-                r'(?i)(?:access_key|access_token|secret_key|api_key|apikey)\s*[=:]\s*[\'"][^\'"]{8,}[\'"]',
-            ],
-            'Information Disclosure': [
-                r'(?i)console\.log\s*\(',
-                r'(?i)alert\s*\(',
-                r'(?i)print_r\s*\(',
-                r'(?i)var_dump\s*\(',
-                r'(?i)phpinfo\s*\(',
-                r'(?i)<!--\s*DEBUG',
-                r'(?i)//\s*DEBUG',
-                r'(?i)^\s*echo\s+.*\$_(?:GET|POST|REQUEST|COOKIE)',
-            ],
-            'Insecure Configuration': [
-                r'(?i)allow_url_include\s*=\s*On',
-                r'(?i)allow_url_fopen\s*=\s*On',
-                r'(?i)display_errors\s*=\s*On',
-                r'(?i)expose_php\s*=\s*On',
-                r'(?i)disable_functions\s*=\s*',
-                r'(?i)safe_mode\s*=\s*Off',
-                r'(?i)X-XSS-Protection:\s*0',
-                r'(?i)Access-Control-Allow-Origin:\s*\*',
-            ],
-            'Software/Library Versions': [
-                r'(?i)jquery[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)bootstrap[\.-](\d+\.\d+\.\d+)(?:\.min)?\.(?:js|css)',
-                r'(?i)angular[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)react[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)vue[\.-](\d+\.\d+\.\d+)(?:\.min)?\.js',
-                r'(?i)wordpress\/(\d+\.\d+)(?:\.\d+)?',
-                r'(?i)express\/(\d+\.\d+\.\d+)',
-                r'(?i)php(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)python(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)ruby(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)node(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)nginx(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)apache(?:\/|-)(\d+\.\d+\.\d+)',
-                r'(?i)server:\s*nginx\/(\d+\.\d+\.\d+)',
-                r'(?i)server:\s*apache\/(\d+\.\d+\.\d+)',
-                r'(?i)server:\s*microsoft-iis\/(\d+\.\d+)',
-                r'(?i)x-powered-by:\s*php\/(\d+\.\d+\.\d+)',
-                r'(?i)x-powered-by:\s*asp\.net',
-                r'(?i)x-powered-by:\s*([^\s\r\n]+)',
-                r'(?i)x-generator:\s*([^\s\r\n]+)',
-                r'(?i)powered-by:\s*([^\s\r\n]+)',
-                r'(?i)x-aspnet-version:\s*([^\s\r\n]+)',
-                r'(?i)laravel[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)django[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)symfony[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)drupal[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)joomla[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)rails[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)flask[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)spring[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)tomcat[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)jetty[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)weblogic[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)websphere[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)mysql[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)postgresql[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)mongodb[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)redis[\/\.-](\d+\.\d+\.\d+)',
-                r'(?i)oracle[\/\.-](\d+\.\d+\.\d+)',
-            ],
-        }
-        
-        # Dictionary to store security findings
-        security_findings = {}
-        
-        # Analyze each code file
+        print(f"Analyzing {len(self.code_files)} files...")
+        analyzed = 0
+        total = len(self.code_files)
+        # Progress bar only
+        for _ in self.code_files.items():
+            analyzed += 1
+            percent = int((analyzed / total) * 100)
+            print(f"\rAnalysis progress: {analyzed}/{total} ({percent}%)", end="")
+        print()  # Newline after progress bar
+
+        # Use SecurityAnalyzer for vulnerability detection
+        from .analyzer import SecurityAnalyzer
+        analyzer = SecurityAnalyzer()
+        security_findings = analyzer.analyze_code(self.code_files)
+
+        # Sink detection: look for dangerous function calls and taint sinks (legacy, for sinks.md)
         for file_path, content in self.code_files.items():
-            file_findings = {}
-            
-            # Analyze based on file extension
-            extension = os.path.splitext(file_path.lower())[1]
-            
-            # Check for security issues
-            for issue_type, patterns in security_patterns.items():
-                matches = []
-                
-                for pattern in patterns:
-                    for match in re.finditer(pattern, content):
-                        line_number = content[:match.start()].count('\n') + 1
-                        line = content.splitlines()[line_number - 1].strip()
-                        matches.append({
-                            'line': line_number,
-                            'code': line,
-                            'match': match.group(0),
-                        })
-                        
-                        # For software/library versions, store the detected version
-                        if issue_type == 'Software/Library Versions' and match.groups():
-                            software_name = pattern.split(r'(?i)')[1].split(r'[\/\.-]')[0].capitalize()
-                            version = match.group(1)
-                            self.detected_versions[f"{software_name} Version"] = version
-                
-                if matches:
-                    file_findings[issue_type] = matches
-            
-            # Sink detection: look for dangerous function calls and taint sinks
-            sink_patterns = [
-                r'(?i)eval\s*\(',
-                r'(?i)exec\s*\(',
-                r'(?i)system\s*\(',
-                r'(?i)popen\s*\(',
-                r'(?i)passthru\s*\(',
-                r'(?i)proc_open\s*\(',
-                r'(?i)assert\s*\(',
-                r'(?i)base64_decode\s*\(',
-                r'(?i)unserialize\s*\(',
-                r'(?i)document\\.write\s*\(',
-                r'(?i)document\\.writeln\s*\(',
-                r'(?i)innerHTML\s*=\s*',
-                r'(?i)outerHTML\s*=\s*',
-                r'(?i)dangerouslySetInnerHTML',
-                r'(?i)document\\.execCommand\s*\(',
-                r'(?i)Function\s*\(',
-                r'(?i)new Function',
-                r'(?i)window\\.Function',
-                r'(?i)window\\.eval',
-                r'(?i)setTimeout\s*\(',
-                r'(?i)setInterval\s*\(',
-                r'(?i)child_process\\.exec\s*\(',
-                r'(?i)os\\.system\s*\(',
-                r'(?i)os\\.exec',
-                r'(?i)os\\.execl',
-                r'(?i)os\\.execle',
-                r'(?i)os\\.execlp',
-                r'(?i)os\\.execlpe',
-                r'(?i)os\\.execv',
-                r'(?i)os\\.execve',
-                r'(?i)os\\.execvp',
-                r'(?i)os\\.execvpe',
-                r'(?i)os\\.popen',
-                r'(?i)os\\.spawn',
-                r'(?i)os\\.fork',
-                r'(?i)os\\.forkpty',
-                r'(?i)os\\.kill',
-                r'(?i)os\\.killpg',
-                r'(?i)os\\.startfile',
-                r'(?i)subprocess\\.(?:call|Popen|run|check_call|check_output)\s*\(',
-                r'(?i)input\s*\(',
-                r'(?i)pickle\\.loads?\s*\(',
-                r'(?i)pickle\\.load\s*\(',
-                r'(?i)yaml\\.load\s*\(',
-                r'(?i)marshal\\.loads\s*\(',
-                r'(?i)unmarshal\s*\(',
-                r'(?i)ObjectInputStream\\.readObject',
-                r'(?i)open\s*\(',
-                r'(?i)require\s*\(',
-                r'(?i)include\s*\(',
-                r'(?i)fetch\s*\(',
-                r'(?i)axios\\.(?:get|post|put|delete|patch)\s*\(',
-                r'(?i)\\.ajax\s*\(',
-                r'(?i)XMLHttpRequest',
-                r'(?i)http\\.request',
-                r'(?i)https\\.request',
-                r'(?i)requests\\.(get|post)',
-                r'(?i)urllib\\.request',
-                r'(?i)curl_exec',
-                r'(?i)curl_setopt',
-                r'(?i)curl_init',
-                r'(?i)socket',
-                r'(?i)netcat',
-                r'(?i)render_template',
-                r'(?i)render',
-                r'(?i)twig\\.render',
-                r'(?i)ejs\\.render',
-                r'(?i)mustache\\.render',
-                r'(?i)mysql_query',
-                r'(?i)mysqli_query',
-                r'(?i)pdo_query',
-                r'(?i)pg_query',
-                r'(?i)sqlite_query',
-                r'(?i)db\\.query',
-                r'(?i)fs\\.(readFile|writeFile|appendFile|createWriteStream|createReadStream|unlink|rmdir)',
-                r'(?i)file_get_contents',
-                r'(?i)file_put_contents',
-                r'(?i)readfile',
-                r'(?i)fopen',
-                r'(?i)shell_exec',
-                r'(?i)create_function',
-                r'(?i)preg_replace',
-                r'(?i)move_uploaded_file',
-                r'(?i)parse_str',
-                r'(?i)Runtime.getRuntime\\(\\)\\.exec',
-                r'(?i)ProcessBuilder',
-                r'(?i)Process.Start',
-                r'(?i)Assembly.Load',
-                r'(?i)AppDomain.CreateDomain',
-                r'(?i)Type.GetType',
-                r'(?i)dangerous_function',
-                r'(?i)dangerous_eval',
-                r'(?i)dangerous_exec',
-                r'(?i)compile\s*\(',
-                r'(?i)execfile\s*\(',
-                r'(?i)exec_module',
-                r'(?i)importlib.import_module',
-                r'(?i)document.location',
-                r'(?i)window.location',
-                r'(?i)location.href',
-                r'(?i)location.replace',
-                r'(?i)location.assign',
-                r'(?i)window.open',
-                r'(?i)window.postMessage',
-                r'(?i)document.cookie',
-                r'(?i)localStorage.setItem',
-                r'(?i)sessionStorage.setItem',
-            ]
+            # Count function calls in JS files
+            extension = os.path.splitext(file_path)[1].lower()
+            if extension == '.js':
+                self.count_js_function_calls(content)
+            # Sink detection patterns (keep for sinks.md)
             for sink_pat in sink_patterns:
                 for match in re.finditer(sink_pat, content):
                     line_number = content[:match.start()].count('\n') + 1
@@ -959,112 +719,15 @@ class WebScanner:
                         'sink': match.group(0),
                         'code': code_line
                     })
-        
-            if file_findings:
-                security_findings[file_path] = file_findings
-            
-            # Look for potential API endpoints
-            api_patterns = [
-                r'(?i)(?:get|post|put|delete|patch|options|head)\s+[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)api_(?:url|endpoint|path|route)\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)endpoint\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)url\s*[=:]\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+/api/[\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)fetch\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)axios\.(?:get|post|put|delete|patch)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)superagent\.(?:get|post|put|delete|patch)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)ky\.(?:get|post|put|delete|patch)\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)\.ajax\s*\(\s*\{\s*url\s*:\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)route\s*\(\s*[\'"]([\/\w\-\._~:\/\?#\[\]@!\$&\'\(\)\*\+,;=%]+)[\'"]',
-                r'(?i)graphql\s*\(',
-                r'(?i)[\'"]([\/\w\-\._~:]*graphql)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/rpc\/?)[\'"]',
-                r'(?i)rpc\s*\(',
-                r'(?i)[\'"]((?:ws|wss):\/\/[\w\.-]+(:\d+)?[\/\w\-\._~:;,%]*)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/websocket)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/socket)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/api-docs)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/swagger)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/openapi)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/rest)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/service[s]?)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/v[0-9]+\/api)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/v[0-9]+\/rpc)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/v[0-9]+\/graphql)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/v[0-9]+\/endpoint)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/endpoint)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/gateway)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/auth)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/oauth)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/data)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/json)[\'"]',
-                r'(?i)[\'"]([\/\w\-\._~:]*\/xml)[\'"]',
-            ]
-            
-            for pattern in api_patterns:
-                for match in re.finditer(pattern, content):
-                    if match.groups():
-                        endpoint = match.group(1)
-                        # If it's a relative URL, make it absolute
-                        if endpoint.startswith('/'):
-                            # Use the base domain to create an absolute URL
-                            endpoint_url = f"https://{self.base_domain}{endpoint}"
-                            self.api_endpoints.add(endpoint_url)
-                        elif endpoint.startswith('http'):
-                            self.api_endpoints.add(endpoint)
-            
-            # Count function calls in JS files
-            if extension == '.js':
-                self.count_js_function_calls(content)
-        
+
         # Generate security report using Reporter class (with improved formatting and Berlin time)
         from .reporter import Reporter
         reporter = Reporter(self.target_url, report_dir=self.report_dir, download_dir=self.download_dir)
-        reporter.generate_security_report(security_findings, pattern_map=security_patterns)
-        
+        reporter.generate_security_report(security_findings)
+
         # After generating the security report, also generate a sinks report if sinks exist
         if self.potential_sinks:
-            # Scoring for sink types
-            sink_score_map = {
-                # Code execution
-                'eval': 10, 'exec': 10, 'system': 10, 'popen': 8, 'passthru': 8, 'proc_open': 8, 'assert': 7,
-                'base64_decode': 6, 'unserialize': 9, 'Function': 8, 'setTimeout': 5, 'setInterval': 5,
-                'child_process.exec': 9, 'os.system': 9, 'subprocess': 8, 'input': 6, 'pickle.loads': 9,
-                'open': 5, 'require': 6, 'include': 6, 'fetch': 5, 'axios': 5, 'ajax': 5,
-                # Reflection and dynamic code
-                'new Function': 8, 'window.Function': 8, 'window.eval': 10, 'document.write': 8, 'document.writeln': 8,
-                'innerHTML': 7, 'outerHTML': 7, 'dangerouslySetInnerHTML': 8, 'document.execCommand': 7,
-                # File operations
-                'fopen': 6, 'file_get_contents': 6, 'readfile': 6, 'file_put_contents': 6, 'fs.readFile': 6, 'fs.writeFile': 6,
-                'fs.appendFile': 6, 'fs.createWriteStream': 6, 'fs.createReadStream': 6, 'fs.unlink': 6, 'fs.rmdir': 6,
-                # Deserialization
-                'pickle.load': 9, 'pickle.loads': 9, 'yaml.load': 8, 'marshal.loads': 8, 'unmarshal': 8, 'ObjectInputStream': 8,
-                # HTTP/network
-                'XMLHttpRequest': 5, 'http.request': 5, 'https.request': 5, 'requests.get': 5, 'requests.post': 5,
-                'urllib.request': 5, 'curl_exec': 6, 'curl_setopt': 6, 'curl_init': 6, 'socket': 6, 'netcat': 7,
-                # Template injection
-                'render': 7, 'render_template': 7, 'twig.render': 7, 'ejs.render': 7, 'mustache.render': 7,
-                # Database
-                'mysql_query': 8, 'mysqli_query': 8, 'pdo_query': 8, 'pg_query': 8, 'sqlite_query': 8, 'db.query': 8,
-                # System/process
-                'os.popen': 8, 'os.spawn': 8, 'os.exec': 10, 'os.execl': 10, 'os.execle': 10, 'os.execlp': 10, 'os.execlpe': 10,
-                'os.execv': 10, 'os.execve': 10, 'os.execvp': 10, 'os.execvpe': 10, 'os.fork': 8, 'os.forkpty': 8,
-                'os.kill': 7, 'os.killpg': 7, 'os.startfile': 7, 'os.system': 9, 'subprocess.Popen': 8, 'subprocess.call': 8,
-                'subprocess.run': 8, 'subprocess.check_call': 8, 'subprocess.check_output': 8,
-                # XSS/DOM
-                'document.location': 7, 'window.location': 7, 'location.href': 7, 'location.replace': 7, 'location.assign': 7,
-                'window.open': 6, 'window.postMessage': 6, 'document.cookie': 6, 'localStorage.setItem': 6, 'sessionStorage.setItem': 6,
-                # PHP-specific
-                'shell_exec': 8, 'create_function': 8, 'preg_replace': 7, 'move_uploaded_file': 7, 'parse_str': 7,
-                # Java-specific
-                'Runtime.getRuntime().exec': 10, 'ProcessBuilder': 8, 'ObjectInputStream.readObject': 8,
-                # .NET-specific
-                'Process.Start': 8, 'Assembly.Load': 8, 'AppDomain.CreateDomain': 7, 'Type.GetType': 7,
-                # Misc dangerous
-                'eval_r': 10, 'execfile': 9, 'compile': 8, 'exec_module': 8, 'importlib.import_module': 7,
-                'dangerous_function': 10, 'dangerous_eval': 10, 'dangerous_exec': 10
-            }
-
-            # Sort sinks by score descending
+            # Sort sinks by score descending using the global sink_score_map loaded from JSON
             sorted_sinks = sorted(self.potential_sinks, key=lambda s: self.get_sink_score(s['sink']), reverse=True)
 
             sinks_report_path = os.path.join(self.report_dir, 'sinks.md')
@@ -1088,41 +751,13 @@ class WebScanner:
             security_report_path = os.path.join(self.report_dir, 'security_report.md')
             with open(security_report_path, 'a', encoding='utf-8') as f:
                 f.write("\n---\n**See [sinks.md](sinks.md) for a summary of potential sink findings.**\n\n")
-        
         # Generate function usage report
         self.generate_function_usage_report()
     
     def get_sink_score(self, sink_name):
         """
-        Return the score for a given sink name based on the sink_score_map.
+        Return the score for a given sink name based on the sink_score_map loaded from JSON.
         """
-        sink_score_map = {
-            'eval': 10, 'exec': 10, 'system': 10, 'popen': 8, 'passthru': 8, 'proc_open': 8, 'assert': 7,
-            'base64_decode': 6, 'unserialize': 9, 'Function': 8, 'setTimeout': 5, 'setInterval': 5,
-            'child_process.exec': 9, 'os.system': 9, 'subprocess': 8, 'input': 6, 'pickle.loads': 9,
-            'open': 5, 'require': 6, 'include': 6, 'fetch': 5, 'axios': 5, 'ajax': 5,
-            'new Function': 8, 'window.Function': 8, 'window.eval': 10, 'document.write': 8, 'document.writeln': 8,
-            'innerHTML': 7, 'outerHTML': 7, 'dangerouslySetInnerHTML': 8, 'document.execCommand': 7,
-            'fopen': 6, 'file_get_contents': 6, 'readfile': 6, 'file_put_contents': 6, 'fs.readFile': 6, 'fs.writeFile': 6,
-            'fs.appendFile': 6, 'fs.createWriteStream': 6, 'fs.createReadStream': 6, 'fs.unlink': 6, 'fs.rmdir': 6,
-            'pickle.load': 9, 'pickle.loads': 9, 'yaml.load': 8, 'marshal.loads': 8, 'unmarshal': 8, 'ObjectInputStream': 8,
-            'XMLHttpRequest': 5, 'http.request': 5, 'https.request': 5, 'requests.get': 5, 'requests.post': 5,
-            'urllib.request': 5, 'curl_exec': 6, 'curl_setopt': 6, 'curl_init': 6, 'socket': 6, 'netcat': 7,
-            'render': 7, 'render_template': 7, 'twig.render': 7, 'ejs.render': 7, 'mustache.render': 7,
-            'mysql_query': 8, 'mysqli_query': 8, 'pdo_query': 8, 'pg_query': 8, 'sqlite_query': 8, 'db.query': 8,
-            'os.popen': 8, 'os.spawn': 8, 'os.exec': 10, 'os.execl': 10, 'os.execle': 10, 'os.execlp': 10, 'os.execlpe': 10,
-            'os.execv': 10, 'os.execve': 10, 'os.execvp': 10, 'os.execvpe': 10, 'os.fork': 8, 'os.forkpty': 8,
-            'os.kill': 7, 'os.killpg': 7, 'os.startfile': 7, 'os.system': 9, 'subprocess.Popen': 8, 'subprocess.call': 8,
-            'subprocess.run': 8, 'subprocess.check_call': 8, 'subprocess.check_output': 8,
-            'document.location': 7, 'window.location': 7, 'location.href': 7, 'location.replace': 7, 'location.assign': 7,
-            'window.open': 6, 'window.postMessage': 6, 'document.cookie': 6, 'localStorage.setItem': 6, 'sessionStorage.setItem': 6,
-            'shell_exec': 8, 'create_function': 8, 'preg_replace': 7, 'move_uploaded_file': 7, 'parse_str': 7,
-            'Runtime.getRuntime().exec': 10, 'ProcessBuilder': 8, 'ObjectInputStream.readObject': 8,
-            'Process.Start': 8, 'Assembly.Load': 8, 'AppDomain.CreateDomain': 7, 'Type.GetType': 7,
-            'eval_r': 10, 'execfile': 9, 'compile': 8, 'exec_module': 8, 'importlib.import_module': 7,
-            'dangerous_function': 10, 'dangerous_eval': 10, 'dangerous_exec': 10
-        }
-        # Try to match the sink name to a key in the map
         for key in sink_score_map:
             if key in sink_name:
                 return sink_score_map[key]
@@ -1228,7 +863,7 @@ class WebScanner:
             if any(server in software.lower() for server in ['apache', 'nginx', 'iis', 'lighttpd', 'caddy']):
                 version_categories['server'][software] = version
             # Frameworks
-            elif any(framework in software.lower() for framework in ['laravel', 'symfony', 'django', 'rails', 'express', 'spring']):
+            elif any(framework in software.lower() for framework in ['laravel', 'symfony', 'django', 'rails', 'express']):
                 version_categories['framework'][software] = version
             # Languages
             elif any(language in software.lower() for language in ['php', 'python', 'ruby', 'node', 'asp.net']):

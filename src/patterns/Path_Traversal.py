@@ -1,40 +1,23 @@
-# Path Traversal patterns
-patterns = [
+# Path Traversal patterns (expanded and commented)
+path_traversal_patterns = [
     # Basic ../ and ..\\ patterns
     r'\.\./',
-    r'\.\..\\\\',
+    r'\.\.\\',
     r'\.\./\.\./',
-    r'\.\..\\\\.\..\\\\',
-    r'\.\./\.\./',
-    r'\.\..\\\\.\..\\\\',
-    r'\.\./',
-    r'\.\..\\',
-    r'\.\./',
-    r'\.\..\\',
-    # URL encoded
+    r'\.\.\\.\.\\',
+    # URL encoded traversal
     r'%2e%2e%2f',
     r'%2e%2e/',
     r'%2e%2e%5c',
     r'%252e%252e%255c',
     r'%c0%ae%c0%ae%c0%af',
     r'%c1%1c%c1%1c',
-    r'%2e%2e%2f',
-    r'%2e%2e%5c',
-    r'%2e%2e%2f',
-    r'%2e%2e%5c',
-    # Double URL encoding
     r'%252e%252e%252f',
     r'%252e%252e%255c',
     r'%255c%255c',
-    r'%c0%ae%c0%ae%c0%af',
-    # Windows/Unix mixed
-    r'\.\./',
-    r'\.\..\\',
-    r'\.\./',
-    r'\.\..\\',
-    # Null byte
+    # Null byte injection
     r'\.\./\x00',
-    r'\.\..\\\x00',
+    r'\.\.\\\x00',
     r'%00',
     # Directory traversal with file
     r'\.\./etc/passwd',
@@ -116,4 +99,31 @@ patterns = [
     r'\.\./\u2215.svn\u2215entries',
     r'\.\./\u2215.hg\u2215hgrc',
     r'\.\./\u2215.bzr\u2215branch\u2215branch.conf',
+    # Additional bypass tricks and encodings
+    r'\.\./\.\./',  # Double traversal
+    r'\.\./\.\./\.\./',  # Triple traversal
+    r'\.\./\.\./\.\./\.\./',  # Quad traversal
+    r'\.\./\.\./\.\./\.\./\.\./',  # Five-level traversal
+    r'\.\./\.\./\\.\\.\\',  # Mixed slashes
+    r'\.\./\\.\\.\\',  # Mixed slashes
+    r'\.\./%2e%2e/',  # Mixed encoding
+    r'\.\./%252e%252e/',  # Double encoding
+    r'\.\./%c0%ae%c0%ae/',  # Unicode encoding
+    r'\.\./%c1%1c%c1%1c/',  # Unicode encoding
+    # Path traversal in function arguments (generic)
+    r'open\s*\(\s*["\']?\.\./',
+    r'fopen\s*\(\s*["\']?\.\./',
+    r'File\s*\(\s*["\']?\.\./',
+    r'fs\.readFile\s*\(\s*["\']?\.\./',
+    r'fs\.createReadStream\s*\(\s*["\']?\.\./',
+    r'fs\.writeFile\s*\(\s*["\']?\.\./',
+    r'fs\.appendFile\s*\(\s*["\']?\.\./',
+    r'fs\.open\s*\(\s*["\']?\.\./',
+    r'os\.open\s*\(\s*["\']?\.\./',
+    r'os\.read\s*\(\s*["\']?\.\./',
+    r'os\.write\s*\(\s*["\']?\.\./',
+    r'os\.remove\s*\(\s*["\']?\.\./',
+    r'os\.unlink\s*\(\s*["\']?\.\./',
+    r'os\.rmdir\s*\(\s*["\']?\.\./',
+    r'os\.rename\s*\(\s*["\']?\.\./',
 ]

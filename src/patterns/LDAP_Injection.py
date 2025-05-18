@@ -1,12 +1,11 @@
-patterns = [
+# Patterns for LDAP Injection (expanded and well-commented)
+ldap_injection_patterns = [
     # TLDR: Detects ldapsearch command with special LDAP filter characters and variable
     r'(?i)ldapsearch.*[+&|!].*\$',
     # TLDR: Detects LDAP filter with variable assignment
     r'(?i)(&(.*=\$.*))',
     # TLDR: Detects LDAP filter with wildcard assignment
     r'(?i)(&(.*=\*.*))',
-    # TLDR: Detects filter parameter with parentheses (potential injection)
-    r'(?i)filter=.*\(|\)',
     # TLDR: Detects objectClass filter with wildcard
     r'(?i)(&(objectClass=*))',
     # TLDR: Detects any ldap_ function usage

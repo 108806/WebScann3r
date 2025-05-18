@@ -1,4 +1,5 @@
-patterns = [
+# Patterns for Software Library Versions (expanded and well-commented)
+software_library_versions_patterns = [
     # Existing patterns
     r'(?i)([a-zA-Z0-9_\-]+)[-_=]v?(\d+\.\d+(?:\.\d+)?)',
     r'(?i)version\s*[:=]\s*[\'\"]?(\d+\.\d+(?:\.\d+)?)[\'\"]?',

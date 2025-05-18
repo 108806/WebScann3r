@@ -1,5 +1,5 @@
-# All patterns for File Inclusion
-patterns = [
+# Patterns for File Inclusion (expanded and well-commented)
+file_inclusion_patterns = [
     r'(?i)(?:include|require|include_once|require_once)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # PHP file include with user input
     r'(?i)fopen\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # fopen with user input
     r'(?i)file_get_contents\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # file_get_contents with user input

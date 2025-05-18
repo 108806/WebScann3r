@@ -1,5 +1,5 @@
-# All patterns for XXE Vulnerabilities
-patterns = [
+# Patterns for XXE Vulnerabilities (expanded and well-commented)
+xxe_vulnerabilities_patterns = [
     r'(?i)\.setFeature\("http://apache.org/xml/features/disallow-doctype-decl",\s*false\)',
     r'(?i)\.setFeature\("http://xml.org/sax/features/external-general-entities",\s*true\)',
     r'(?i)\.setFeature\("http://xml.org/sax/features/external-parameter-entities",\s*true\)',

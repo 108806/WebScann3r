@@ -1,5 +1,5 @@
-# All patterns for SSRF Vulnerabilities
-patterns = [
+# Patterns for SSRF Vulnerabilities (expanded and well-commented)
+ssrf_vulnerabilities_patterns = [
     r'(?i)(?:axios|fetch|http|request|got|superagent|curl_exec)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',  # HTTP client with user input
     r'(?i)new\s+URL\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',  # JS URL() with user input
     r'(?i)\.get\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',  # .get() with user input
