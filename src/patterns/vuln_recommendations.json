@@ -1,0 +1,282 @@
+{
+  "SQL Injection": [
+    "Use parameterized queries (prepared statements) for all database operations",
+    "Apply input validation and sanitization",
+    "Implement proper escaping of user input",
+    "Apply the principle of least privilege for database accounts",
+    "Use ORM (Object Relational Mapping) libraries when possible"
+  ],
+  "XSS": [
+    "Implement Content Security Policy (CSP)",
+    "Use output encoding for all user-generated content",
+    "Validate input on both client and server side",
+    "Use modern frameworks that automatically escape XSS by design",
+    "Use the X-XSS-Protection header as an additional layer of protection"
+  ],
+  "Command Injection": [
+    "Avoid using system commands with user-provided input",
+    "Use safer alternatives to shell commands",
+    "Implement strict input validation and whitelist input values",
+    "Use APIs for the needed functionality instead of system commands",
+    "Run with the least privileges necessary"
+  ],
+  "File Inclusion": [
+    "Implement proper input validation and sanitization",
+    "Use whitelist of allowed files instead of direct user input",
+    "Avoid passing user-supplied input to file system APIs",
+    "Store sensitive files outside the web root",
+    "Implement proper access controls"
+  ],
+  "Insecure Crypto": [
+    "Use modern, strong encryption algorithms (AES-256, RSA-2048)",
+    "Implement proper key management",
+    "Use secure hashing algorithms (SHA-256, SHA-3)",
+    "Never roll your own cryptography",
+    "Keep cryptographic libraries updated"
+  ],
+  "Hardcoded Credentials": [
+    "Use environment variables or secure configuration storage",
+    "Implement proper secrets management",
+    "Use credential rotation",
+    "Encrypt sensitive configuration values",
+    "Implement the principle of least privilege"
+  ],
+  "Information Disclosure": [
+    "Implement proper error handling",
+    "Disable debugging information in production",
+    "Configure proper HTTP headers",
+    "Remove unnecessary files and documentation from production servers",
+    "Implement proper access controls"
+  ],
+  "CSRF Vulnerabilities": [
+    "Implement anti-CSRF tokens for all state-changing operations",
+    "Use the SameSite cookie attribute",
+    "Verify the origin of requests",
+    "Implement proper session management",
+    "Use the X-Frame-Options header to prevent clickjacking"
+  ],
+  "SSRF Vulnerabilities": [
+    "Implement a whitelist of allowed domains and resources",
+    "Disable unnecessary URL schemas (file://, ftp://, etc.)",
+    "Use a URL parser to validate URLs",
+    "Block requests to private networks (127.0.0.1, 169.254.0.0, etc.)",
+    "Implement request timeouts to prevent denial of service"
+  ],
+  "XXE Vulnerabilities": [
+    "Disable external entity processing in XML parsers",
+    "Use less complex data formats like JSON when possible",
+    "Patch or upgrade XML processors and libraries",
+    "Implement server-side input validation, filtering, or sanitization",
+    "Configure XML parsers to use secure settings by default"
+  ],
+  "Open Redirect": [
+    "Implement a whitelist of allowed redirect URLs",
+    "Use indirect reference maps for redirects",
+    "Avoid passing user-supplied input directly to redirect functions",
+    "Validate URLs before redirecting",
+    "Use absolute URLs within the application"
+  ],
+  "JWT Issues": [
+    "Use strong signing keys",
+    "Implement proper signature validation",
+    "Include expiration times in tokens",
+    "Do not store sensitive data in JWTs",
+    "Use secure algorithms (RS256 instead of HS256 for public clients)"
+  ],
+  "Deserialization": [
+    "Avoid deserializing data from untrusted sources",
+    "Implement integrity checks",
+    "Use safer serialization formats",
+    "Monitor applications for unexpected deserialization",
+    "Apply the principle of least privilege"
+  ],
+  "LDAP Injection": [
+    "Use parameterized LDAP queries",
+    "Validate and sanitize all user inputs",
+    "Apply the principle of least privilege",
+    "Escape special characters in LDAP queries",
+    "Monitor and log LDAP access patterns"
+  ],
+  "NoSQL Injection": [
+    "Use safe query APIs that separate code from data",
+    "Validate and sanitize all user inputs",
+    "Avoid string concatenation in queries",
+    "Apply the principle of least privilege",
+    "Monitor and log database access patterns"
+  ],
+  "Insecure Randomness": [
+    "Use cryptographically secure random number generators",
+    "Avoid using Math.random() or similar for security-sensitive operations",
+    "Review all uses of randomness in the codebase",
+    "Document and test random number usage",
+    "Keep cryptographic libraries updated"
+  ],
+  "Path Traversal": [
+    "Validate and sanitize user input",
+    "Use built-in path canonicalization functions",
+    "Implement proper access controls",
+    "Apply the principle of least privilege",
+    "Use file system APIs that restrict access to specific directories"
+  ],
+  "Weak JWT Secret": [
+    "Use strong, randomly generated secrets for signing JWTs",
+    "Rotate secrets regularly",
+    "Do not expose secrets in code or configuration",
+    "Monitor for brute-force attempts",
+    "Use environment variables for secret management"
+  ],
+  "Software/Library Versions": [
+    "Maintain an inventory of used libraries and dependencies",
+    "Regularly update dependencies to their latest secure versions",
+    "Use automated tools to check for outdated dependencies",
+    "Subscribe to security bulletins for used components",
+    "Implement a proper patch management process"
+  ],
+  "Directory Listing Enabled": [
+    "Disable directory listing on the web server",
+    "Restrict access to sensitive directories",
+    "Use proper access controls",
+    "Remove unnecessary files from web directories",
+    "Monitor server configuration changes"
+  ],
+  "Server-Side Template Injection (SSTI)": [
+    "Avoid using user input in templates",
+    "Use template engines that auto-escape input",
+    "Validate and sanitize all template data",
+    "Apply the principle of least privilege",
+    "Monitor for unexpected template rendering behavior"
+  ],
+  "Insecure Configuration": [
+    "Implement secure configuration management",
+    "Use security headers (X-Content-Type-Options, X-Frame-Options, etc.)",
+    "Disable unnecessary features and modules",
+    "Keep systems and software updated",
+    "Use automated scanning tools to check for misconfigurations"
+  ],
+  "Unrestricted File Upload": [
+    "Restrict allowed file types and sizes",
+    "Scan uploaded files for malware",
+    "Store uploads outside the web root",
+    "Implement authentication and authorization checks",
+    "Rename uploaded files to prevent overwriting"
+  ],
+  "Unvalidated Redirects": [
+    "Avoid using user input for redirect destinations",
+    "Implement a whitelist of allowed redirect URLs",
+    "Validate and sanitize all redirect parameters",
+    "Log and monitor redirect usage",
+    "Educate users about phishing risks"
+  ],
+  "CORS Misconfiguration": [
+    "Set strict CORS policies",
+    "Avoid using wildcard origins",
+    "Validate allowed origins and methods",
+    "Monitor CORS policy changes",
+    "Educate developers on CORS risks"
+  ],
+  "Insecure HTTP Headers": [
+    "Set security headers such as Content-Security-Policy, X-Frame-Options, and X-Content-Type-Options",
+    "Review and update header configurations regularly",
+    "Disable unnecessary headers",
+    "Monitor for header misconfigurations",
+    "Educate developers on secure header usage"
+  ],
+  "XML Injection": [
+    "Validate and sanitize all XML input",
+    "Use safe XML parsers",
+    "Avoid dynamic construction of XML documents from user input",
+    "Apply the principle of least privilege",
+    "Monitor for unexpected XML processing behavior"
+  ],
+  "Insecure Cookie Flags": [
+    "Set HttpOnly, Secure, and SameSite flags on all cookies",
+    "Avoid storing sensitive data in cookies",
+    "Regularly review cookie settings",
+    "Monitor for cookie theft attempts",
+    "Educate developers on secure cookie practices"
+  ],
+  "Use of Dangerous Functions": [
+    "Avoid using dangerous functions such as eval, exec, or system",
+    "Use safer alternatives or libraries",
+    "Validate and sanitize all inputs to such functions",
+    "Apply the principle of least privilege",
+    "Monitor for unexpected function usage"
+  ],
+  "Race Condition": [
+    "Use proper locking mechanisms and atomic operations",
+    "Avoid time-of-check to time-of-use (TOCTOU) bugs",
+    "Review concurrent code for shared resource access",
+    "Test for race conditions in multi-threaded environments",
+    "Apply principle of least privilege to critical operations"
+  ],
+  "Business Logic Flaw": [
+    "Review application workflows for abuse cases",
+    "Implement strict input validation and authorization checks",
+    "Perform threat modeling and business logic testing",
+    "Educate developers on business logic risks",
+    "Monitor for unusual application behavior"
+  ],
+  "Clickjacking": [
+    "Set X-Frame-Options header to DENY or SAMEORIGIN",
+    "Implement Content Security Policy (CSP) frame-ancestors directive",
+    "Avoid embedding sensitive pages in iframes",
+    "Educate users about clickjacking risks",
+    "Test application for frame-based attacks"
+  ],
+  "HTTP Parameter Pollution": [
+    "Deduplicate and validate all HTTP parameters",
+    "Use frameworks that handle parameter arrays safely",
+    "Avoid using user input directly in queries",
+    "Log and monitor for suspicious parameter usage",
+    "Educate developers on parameter pollution risks"
+  ],
+  "Reflected File Download": [
+    "Avoid reflecting user input in file names or contents",
+    "Validate and sanitize all user-supplied file names",
+    "Set appropriate Content-Disposition headers",
+    "Educate users about download risks",
+    "Monitor for suspicious file download activity"
+  ],
+  "Log Injection": [
+    "Sanitize user input before logging",
+    "Avoid logging sensitive or untrusted data",
+    "Implement log integrity controls",
+    "Monitor logs for suspicious entries",
+    "Educate developers on log injection risks"
+  ],
+  "Host Header Injection": [
+    "Validate and whitelist Host headers",
+    "Avoid using Host headers for security decisions",
+    "Set a default host value on the server",
+    "Monitor for unusual Host header values",
+    "Educate developers on host header risks"
+  ],
+  "Misconfigured Caching": [
+    "Set strict Cache-Control headers for sensitive data",
+    "Avoid caching authenticated or sensitive responses",
+    "Review and test cache configurations",
+    "Educate developers on caching risks",
+    "Monitor for cache-related incidents"
+  ],
+  "Session Fixation": [
+    "Regenerate session IDs after login",
+    "Do not accept session IDs from user input",
+    "Set session cookies with Secure and HttpOnly flags",
+    "Monitor for session fixation attempts",
+    "Educate developers on session management best practices"
+  ],
+  "Insufficient Logging & Monitoring": [
+    "Log all critical security events",
+    "Monitor logs for suspicious activity",
+    "Alert on detection of security incidents",
+    "Retain logs securely for forensic analysis",
+    "Regularly review and test logging mechanisms"
+  ],
+  "Sensitive Data Exposure": [
+    "Encrypt sensitive data at rest and in transit",
+    "Mask sensitive data in logs and error messages",
+    "Implement access controls for sensitive data",
+    "Regularly audit data access and storage",
+    "Educate developers on data protection best practices"
+  ]
+}
