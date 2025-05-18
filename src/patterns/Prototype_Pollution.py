@@ -1,4 +1,5 @@
-patterns = [
+# Patterns for Prototype Pollution (expanded and well-commented)
+prototype_pollution_patterns = [
     # Direct property names (classic)
     r'(?i)["\']__proto__["\']',
     r'(?i)["\']constructor["\']',
@@ -63,7 +64,9 @@ patterns = [
     # Popular libraries
     r'(?i)\bdeepmerge\(',
     r'(?i)\bmerge\(',
-    r'(?i)\bextend\(',
+    # r'(?i)\bextend\(', # Commented: too broad, causes false positives on common JS usage like jQuery.extend()
+    # r'(?i)\bjQuery.extend\(', # Commented: too broad, causes false positives on common JS usage
+    # r'(?i)\$\.extend\(', # Commented: too broad, causes false positives on common JS usage
     r'(?i)\bdefaults\(',
     r'(?i)\bassignIn\(',
     r'(?i)\bmergeWith\(',
@@ -122,7 +125,7 @@ patterns = [
     r'(?i)\bassign\b',
     r'(?i)\bmerge\b',
     r'(?i)\bdeepmerge\b',
-    r'(?i)\bextend\b',
+    r#'(?i)\bextend\b',
     r'(?i)\bdefaults\b',
     r'(?i)\bassignIn\b',
     r'(?i)\bmergeWith\b',
