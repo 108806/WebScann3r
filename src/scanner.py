@@ -59,8 +59,8 @@ with open(sink_score_map_path, 'r', encoding='utf-8') as f:
 
 class WebScanner:
     def __init__(self, target_url, download_dir='targets', report_dir='targets', same_domain_only=True, 
-                 download_media=False, download_archives=False, download_text=False, threads=10, timeout=30,
-                 max_depth=1):  # Set default max_depth to 1
+                 download_media=False, download_archives=False, download_text=False, threads=15, timeout=20,
+                 max_depth=3):  # Set default max_depth to 3
         """
         Initialize the web scanner
         

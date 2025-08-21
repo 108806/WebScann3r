@@ -32,8 +32,9 @@ def main():
     parser.add_argument("-m", "--media", help="Download media files (images, videos, etc.)", action="store_true")
     parser.add_argument("-z", "--archives", help="Download archive files (zip, tar, etc.)", action="store_true")
     parser.add_argument("-t", "--text", help="Download text files (txt, md, etc.)", action="store_true")
-    parser.add_argument("-j", "--threads", help="Number of concurrent threads (default: 10)", type=int, default=10)
-    parser.add_argument("--timeout", help="Request timeout in seconds (default: 30)", type=int, default=30)
+    parser.add_argument("--depth", help="Maximum crawling depth for same-domain scanning (default: 3)", type=int, default=3)
+    parser.add_argument("-j", "--threads", help="Number of concurrent threads (default: 15)", type=int, default=15)
+    parser.add_argument("--timeout", help="Request timeout in seconds (default: 20)", type=int, default=20)
     parser.add_argument("-v", "--verbose", help="Enable verbose output", action="store_true")
     parser.add_argument("-q", "--quiet", help="Suppress all output except errors", action="store_true")
     
@@ -63,7 +64,7 @@ def main():
             download_dir=args.downloads,
             report_dir=args.reports,
             same_domain_only=args.all_domains is None,
-            max_depth=args.all_domains,
+            max_depth=args.all_domains if args.all_domains is not None else args.depth,
             download_media=args.media,
             download_archives=args.archives,
             download_text=args.text,
