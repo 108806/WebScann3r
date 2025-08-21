@@ -87,7 +87,7 @@ class WebScanner:
         self.timeout = timeout
         
         # Create site-specific directories with timestamp
-        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        timestamp = time.strftime('%Y-%m-%d_%H-%M-%S')
         site_dir = f"{self.base_domain.replace(':', '_')}_{timestamp}"
         
         # Directories setup - everything under targets/sitename_timestamp/
