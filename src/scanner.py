@@ -176,13 +176,22 @@ class WebScanner:
             if any(char in path for char in dangerous_chars):
                 return False
                 
-            # Reject URLs that look like regex patterns
-            regex_indicators = [r'\[', r'\]', r'\(', r'\)', r'\^', r'\$', r'\+', r'\*', r'\?']
+            # Reject URLs that look like regex patterns - more strict check
+            regex_indicators = [r'\[', r'\]', r'\(', r'\)', r'\^', r'\$', r'\+', r'\*', r'\?', r'\.', r'|', r';', r'=', r',']
             if any(indicator in path for indicator in regex_indicators):
                 return False
                 
+            # Reject URLs with suspicious content that looks like JavaScript
+            js_indicators = ['function(', 'return', '.fn.', '$.', 'arguments.length', '/g,', '/i,']
+            if any(indicator in path for indicator in js_indicators):
+                return False
+                
             # Reject URLs that are too long (likely malformed)
-            if len(url) > 2000:
+            if len(url) > 500:  # Reduced from 2000
+                return False
+                
+            # Reject paths that don't look like real URLs
+            if len(path) > 200:  # Path itself shouldn't be too long
                 return False
                 
             return True
