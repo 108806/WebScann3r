@@ -28,8 +28,8 @@ information_disclosure_patterns = [
     r'(?i)System\.err\.print',  # Java System.err.print
     r'(?i)\.printStackTrace\s*\(',  # Java .printStackTrace()
     # Ruby
-    r'(?i)puts\s*\(',  # Ruby puts
-    r'(?i)p\s*\(',  # Ruby p (print)
+    r'(?i)\bputs\s*\(',  # Ruby puts (word boundary to be more specific)
+    # r'(?i)p\s*\(',  # Ruby p - removed as too broad, catches many false positives
     # C#
     r'(?i)Console\.WriteLine\s*\(',  # C# Console.WriteLine
     # Generic debug keywords in comments
@@ -62,7 +62,8 @@ information_disclosure_patterns = [
     r'(?i)\.key$',  # Key file
     r'(?i)\.crt$',  # Certificate file
     r'(?i)passwd',  # passwd file
-    r'(?i)shadow',  # shadow file
+    r'(?i)/etc/shadow',  # shadow file (specific path to avoid CSS false positives)
+    # r'(?i)\bshadow\b',  # Removed: still catches CSS, too broad
     r'(?i)\.htpasswd',  # .htpasswd file
     r'(?i)\.htaccess',  # .htaccess file
 ]

@@ -12,8 +12,9 @@ file_inclusion_patterns = [
     r'(?i)require\s*[\'\"]?\s*\$\w+', # require with variable
     r'(?i)importlib\.import_module\s*\(\s*.*\)', # Python importlib with variable
     r'(?i)__import__\s*\(\s*.*\)', # Python __import__ with variable
-    r'(?i)open\s*\(\s*.*\)', # open() any input
-    r'(?i)load\s*\(\s*.*\)', # load() any input
+    # Removed overly broad patterns that cause false positives:
+    # r'(?i)open\s*\(\s*.*\)', # open() - too broad, catches DOM API
+    # r'(?i)load\s*\(\s*.*\)', # load() - too broad, catches JS events
     r'(?i)File\.open\s*\(\s*.*\)', # Ruby File.open any input
     r'(?i)require_relative\s*\(\s*.*\)', # Ruby require_relative any input
     r'(?i)fs\.readFileSync\s*\(\s*.*\)', # Node.js fs.readFileSync any input
@@ -42,4 +43,9 @@ file_inclusion_patterns = [
     r'(?i)file://', # file:// wrapper
     r'(?i)php://', # php:// wrapper
     r'(?i)data://', # data:// wrapper
+    
+    # More precise patterns to reduce false positives
+    r'(?i)\bopen\s*\(\s*["\']?[./\\]+.*\$_(?:GET|POST|REQUEST)', # open() with path traversal and user input
+    r'(?i)file_get_contents\s*\(\s*["\']?https?://', # file_get_contents with URLs (SSRF)
+    r'(?i)(?:include|require).*\.\./', # include/require with path traversal
 ]

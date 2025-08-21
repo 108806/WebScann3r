@@ -98,7 +98,7 @@ use_of_dangerous_functions_patterns = [
     r'(?i)send\s*\(',
     r'(?i)system\s*\(',
     r'(?i)exec\s*\(',
-    r'(?i)open\s*\(',
+    # r'(?i)open\s*\(',  # Removed: too broad, catches DOM API
     r'(?i)IO\.popen\s*\(',
     r'(?i)Kernel\.eval\s*\(',
     r'(?i)Kernel\.system\s*\(',

@@ -29,6 +29,7 @@ from .patterns.Directory_Listing_Enabled import directory_listing_enabled_patter
 from .patterns.Weak_JWT_Secret import weak_jwt_secret_patterns
 from .patterns.Server_Side_Template_Injection import ssti_patterns
 from .patterns.Unvalidated_Redirects import unvalidated_redirects_patterns
+from .patterns.CVE_RCE_Patterns import cve_rce_patterns, cve_endpoint_patterns, vulnerable_versions
 from .patterns.Sensitive_Data_Exposure import sensitive_data_exposure_patterns
 from .patterns.Reflected_File_Download import reflected_file_download_patterns
 from .patterns.Insecure_HTTP_Headers import insecure_http_header_patterns
@@ -94,6 +95,7 @@ class SecurityAnalyzer:
             'Race Condition': race_condition_patterns,
             'Clickjacking': clickjacking_patterns,
             'Host Header Injection': host_header_injection_patterns,
+            'CVE/RCE Patterns': cve_rce_patterns,
         }
         
         # Mapping security issues to OWASP Top 10 Categories
@@ -137,6 +139,7 @@ class SecurityAnalyzer:
             'Misconfigured Caching': 'A05:2021-Security Misconfiguration',
             'Session Fixation': 'A07:2021-Identification and Authentication Failures',
             'Insufficient Logging & Monitoring': 'A09:2021-Security Logging and Monitoring Failures',
+            'CVE/RCE Patterns': 'A06:2021-Vulnerable and Outdated Components',
         }
         
         # Risk levels for each vulnerability type
@@ -180,6 +183,7 @@ class SecurityAnalyzer:
             'Misconfigured Caching': 'Medium',
             'Session Fixation': 'High',
             'Insufficient Logging & Monitoring': 'Medium',
+            'CVE/RCE Patterns': 'Critical',
         }
         
         # Use loaded JSON for descriptions and recommendations

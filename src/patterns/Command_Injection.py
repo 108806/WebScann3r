@@ -22,10 +22,17 @@ command_injection_patterns = [
     # r'(?i)passthru\s*\(\s*.*\)', # passthru() any input (commented: too broad, not always dangerous)
     # r'(?i)shell_exec\s*\(\s*.*\)', # shell_exec() any input (commented: too broad, not always dangerous)
     # r'(?i)open\s*\(\s*.*\)', # open() any input (commented: too broad, not always dangerous)
-    r'(?i)\$\(.*\)', # Shell $() command substitution
-    r'(?i)\$\w+', # Shell variable expansion
+    # Removed overly broad patterns that cause false positives:
+    # r'(?i)\$\(.*\)', # Shell $() - too broad, catches JavaScript selectors
+    # r'(?i)\$\w+', # Shell vars - too broad, catches JS variables
     # r'(?i)\bcat\b|\bgrep\b|\bwget\b|\bcurl\b|\bftp\b|\bscp\b|\bssh\b|\bpython\b|\bperl\b|\bphp\b|\bnode\b|\bjava\b|\bawk\b|\bsed\b|\bnetcat\b|\bnc\b', # Commented: too broad, causes false positives on common words like 'node', 'php', etc.
     r'(?i)sh\s+-c\s+.*', # sh -c command string
     r'(?i)bash\s+-c\s+.*', # bash -c command string
     r'(?i)cmd\.exe\s+/c\s+.*', # Windows cmd.exe /c command string
+    
+    # More precise patterns to reduce false positives
+    r'(?i)\beval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # eval with user input
+    r'(?i)\bassert\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # PHP assert with user input
+    r'(?i)(?:exec|system|shell_exec)\s*\(\s*["\'].*\$_(?:GET|POST|REQUEST)', # Commands with user input
+    r'(?i)(?:exec|system|shell_exec)\s*\(\s*.*\.\s*\$_(?:GET|POST|REQUEST)', # Command concatenation
 ]

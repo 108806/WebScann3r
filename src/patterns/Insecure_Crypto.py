@@ -6,18 +6,18 @@ insecure_crypto_patterns = [
     r'(?i)sha-1',  # Use of SHA-1 string
     r'(?i)ripemd160',  # Use of RIPEMD160
     r'(?i)whirlpool',  # Use of Whirlpool
-    # Weak/block ciphers
-    r'(?i)crypt\s*\(',  # Use of crypt()
-    r'(?i)des\s*\(',  # Use of DES
-    r'(?i)rc2\s*\(',  # Use of RC2
-    r'(?i)rc4\s*\(',  # Use of RC4
-    r'(?i)rc5\s*\(',  # Use of RC5
-    r'(?i)blowfish\s*\(',  # Use of Blowfish
-    r'(?i)CAST5',  # Use of CAST5
-    r'(?i)CAST6',  # Use of CAST6
-    r'(?i)TEA',  # Use of TEA
-    r'(?i)XTEA',  # Use of XTEA
-    r'(?i)ARC4',  # Use of ARC4
+    # Weak/block ciphers (with word boundaries to avoid false positives)
+    r'(?i)\bcrypt\s*\(',  # Use of crypt()
+    r'(?i)\bdes\s*\(',  # Use of DES
+    r'(?i)\brc2\s*\(',  # Use of RC2
+    r'(?i)\brc4\s*\(',  # Use of RC4
+    r'(?i)\brc5\s*\(',  # Use of RC5
+    r'(?i)\bblowfish\s*\(',  # Use of Blowfish
+    r'(?i)\bCAST5\b',  # Use of CAST5
+    r'(?i)\bCAST6\b',  # Use of CAST6
+    r'(?i)\bTEA\b',  # Use of TEA (word boundary to avoid false positives)
+    r'(?i)\bXTEA\b',  # Use of XTEA
+    r'(?i)\bARC4\b',  # Use of ARC4
     # Insecure modes
     r'(?i)ECB',  # Use of ECB mode
     r'(?i)CBC',  # Use of CBC mode (sometimes insecure if not used with random IV)
