@@ -16,6 +16,19 @@ js_url_patterns = [
     r'EventSource\([\'\"]([^\'\"]+)[\'\"]\)',  # EventSource URLs
     r'location\.href\s*=\s*[\'\"]([^\'\"]+)[\'\"]',  # location.href assignment
     r'window\.open\([\'\"]([^\'\"]+)[\'\"]',  # window.open
+    # New patterns for dynamic script loading
+    r'document\.createElement\([\'\"]\s*script\s*[\'\"]\)[\s\S]*?\.src\s*=\s*[\'\"]([^\'\"]+)[\'\"]',  # createElement script
+    r'\.setAttribute\(\s*[\'\"]\s*src\s*[\'\"]\s*,\s*[\'\"]([^\'\"]+)[\'\"]',  # setAttribute src
+    r'\.src\s*=\s*[\'\"]([^\'\"]+\.js[^\'\"]*)[\'\"]\s*;',  # Direct .src assignment
+    r'require\([\'\"]([^\'\"]+)[\'\"]\)',  # CommonJS require
+    r'loadScript\([\'\"]([^\'\"]+)[\'\"]\)',  # Custom loadScript functions
+    r'getScript\([\'\"]([^\'\"]+)[\'\"]\)',  # jQuery getScript
+    r'[\'\"]\s*/[^\'\"]*\.js[^\'\"]*\s*[\'\"]\s*[,\)]',  # JS file paths in arrays/function calls
+    # AJAX and XHR patterns
+    r'ajaxGet\(\s*[\'\"]([^\'\"]+)[\'\"]',  # Custom ajaxGet function calls
+    r'get\(\s*[\'\"]([^\'\"]+)[\'\"]',  # Custom get function calls (like in our target)
+    r'x\.open\(\s*[\'\"]GET[\'\"],\s*[\'\"]([^\'\"]+)[\'\"]',  # Direct XMLHttpRequest.open calls
+    r'\.send\(\s*[\'\"]([^\'\"]+)[\'\"]',  # XHR send with URL
 ]
 
 css_url_patterns = [

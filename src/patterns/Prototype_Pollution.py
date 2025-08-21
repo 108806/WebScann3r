@@ -125,7 +125,7 @@ prototype_pollution_patterns = [
     r'(?i)\bassign\b',
     r'(?i)\bmerge\b',
     r'(?i)\bdeepmerge\b',
-    r#'(?i)\bextend\b',
+    #r'(?i)\bextend\b',
     r'(?i)\bdefaults\b',
     r'(?i)\bassignIn\b',
     r'(?i)\bmergeWith\b',

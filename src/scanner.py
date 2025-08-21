@@ -137,6 +137,10 @@ class WebScanner:
             'Cache-Control': 'no-cache',
         }
         
+        # Initialize session for cookie handling and connection reuse
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
+        
         # Function call counters
         self.function_calls = {}
         
@@ -236,7 +240,7 @@ class WebScanner:
         
         while retry_count < max_retries:
             try:
-                response = requests.get(url, headers=self.headers, timeout=self.timeout, allow_redirects=True)
+                response = self.session.get(url, timeout=self.timeout, allow_redirects=True)
                 
                 # Check for API endpoints using centralized patterns
                 url_path = urlparse(url).path.lower()
@@ -267,7 +271,22 @@ class WebScanner:
                 elif 'text/html' in content_type:
                     # Handle HTML pages
                     self.save_and_store_code(url, response.text, file_path)
-                    return self.extract_urls(url, response.text)
+                    discovered_urls = self.extract_urls(url, response.text)
+                    # Also check for JavaScript redirects
+                    js_redirects = self.handle_javascript_redirects(url, response.text)
+                    discovered_urls.extend(js_redirects)
+                    # Check for auto-submitting forms
+                    form_urls = self.handle_auto_submit_forms(url, response.text)
+                    discovered_urls.extend(form_urls)
+                    
+                    # Special case: IntraWeb applications detection in HTML
+                    if 'IntraWeb' in response.text or 'IW_' in response.text or '/$/' in response.text:
+                        intraweb_main = urljoin(url, '/$/') 
+                        if self.should_process_url(intraweb_main):
+                            discovered_urls.append(intraweb_main)
+                            logger.info(f"Detected IntraWeb application in HTML, adding main app URL: {intraweb_main}")
+                    
+                    return discovered_urls
                 
                 elif any(file in url.lower() for file in self.special_files):
                     # Handle special files like robots.txt
@@ -304,6 +323,113 @@ class WebScanner:
                 logger.error(f"Error processing {url}: {e}")
                 traceback.print_exc()
                 return []
+    
+    def handle_javascript_redirects(self, url, html_content):
+        """
+        Check for JavaScript redirects and follow them
+        
+        Args:
+            url (str): Current URL
+            html_content (str): HTML content to check for redirects
+            
+        Returns:
+            list: List of URLs discovered from redirects
+        """
+        discovered_urls = []
+        
+        # Common JavaScript redirect patterns
+        js_redirect_patterns = [
+            r'window\.location\.replace\([\'"]([^\'"]+)[\'"]\)',
+            r'window\.location\.href\s*=\s*[\'"]([^\'"]+)[\'"]',
+            r'location\.replace\([\'"]([^\'"]+)[\'"]\)',
+            r'location\.href\s*=\s*[\'"]([^\'"]+)[\'"]',
+            r'document\.location\s*=\s*[\'"]([^\'"]+)[\'"]',
+        ]
+        
+        for pattern in js_redirect_patterns:
+            matches = re.finditer(pattern, html_content, re.IGNORECASE)
+            for match in matches:
+                redirect_url = match.group(1)
+                absolute_url = urljoin(url, redirect_url)
+                if self.should_process_url(absolute_url):
+                    discovered_urls.append(absolute_url)
+                    logger.info(f"Found JS redirect: {redirect_url} -> {absolute_url}")
+        
+        return discovered_urls
+    
+    def handle_auto_submit_forms(self, url, html_content):
+        """
+        Check for auto-submitting forms and simulate their submission
+        
+        Args:
+            url (str): Current URL
+            html_content (str): HTML content to check for forms
+            
+        Returns:
+            list: List of URLs discovered from form submissions
+        """
+        discovered_urls = []
+        
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            forms = soup.find_all('form')
+            
+            logger.info(f"Found {len(forms)} forms in {url}")
+            
+            for form in forms:
+                # Check if form has JavaScript auto-submit (init() function call or f.submit())
+                logger.info(f"Checking form: {form}")
+                has_auto_submit = 'init()' in html_content or 'submit()' in html_content
+                logger.info(f"Auto-submit detected: {has_auto_submit}")
+                
+                if has_auto_submit:
+                    action = form.get('action', '')
+                    method = form.get('method', 'get').lower()
+                    
+                    logger.info(f"Found auto-submit form: action={action}, method={method}")
+                    
+                    if action:
+                        form_url = urljoin(url, action)
+                        
+                        if method == 'post':
+                            # Extract form data
+                            form_data = {}
+                            for input_tag in form.find_all('input'):
+                                name = input_tag.get('name')
+                                value = input_tag.get('value', '')
+                                if name:
+                                    # Set default dimensions for width/height fields
+                                    if 'width' in name.lower():
+                                        value = '1920'
+                                    elif 'height' in name.lower():
+                                        value = '1080'
+                                    form_data[name] = value
+                            
+                            logger.info(f"Auto-submitting form POST to {form_url} with data: {form_data}")
+                            
+                            # Submit the form
+                            try:
+                                response = self.session.post(form_url, data=form_data, timeout=self.timeout, allow_redirects=True)
+                                if response.status_code == 200:
+                                    # Check if this is a redirect to another page
+                                    if response.url != form_url:
+                                        logger.info(f"Form submission redirected to: {response.url}")
+                                        discovered_urls.append(response.url)
+                                    
+                                    # Also check for JS redirects in the response
+                                    js_redirects = self.handle_javascript_redirects(response.url, response.text)
+                                    discovered_urls.extend(js_redirects)
+                                    
+                            except Exception as e:
+                                logger.warning(f"Error submitting form to {form_url}: {e}")
+                        
+                        elif method == 'get' and self.should_process_url(form_url):
+                            discovered_urls.append(form_url)
+        
+        except Exception as e:
+            logger.warning(f"Error processing forms in {url}: {e}")
+        
+        return discovered_urls
     
     def get_file_path(self, url):
         """
@@ -571,6 +697,13 @@ class WebScanner:
                 absolute_url = urljoin(base_url, url)
                 if self.should_process_url(absolute_url):
                     discovered_urls.append(absolute_url)
+        
+        # Special case: IntraWeb applications - if we see IntraWeb patterns, try /$/
+        if 'IntraWeb' in js_content or 'IW_' in js_content or '/$/' in js_content:
+            intraweb_main = urljoin(base_url, '/$/') 
+            if self.should_process_url(intraweb_main):
+                discovered_urls.append(intraweb_main)
+                logger.info(f"Detected IntraWeb application, adding main app URL: {intraweb_main}")
         
         # Analyze function calls in JS and count them
         self.count_js_function_calls(js_content)
