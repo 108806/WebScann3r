@@ -152,6 +152,43 @@ class WebScanner:
         self.failed_downloads = 0
         self.failed_files = []
         
+    def is_valid_url(self, url):
+        """
+        Validate if URL is properly formatted and safe for processing
+        
+        Args:
+            url (str): URL to validate
+            
+        Returns:
+            bool: True if URL is valid, False otherwise
+        """
+        try:
+            # Basic URL parsing check
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                return False
+                
+            # Check for dangerous characters that could cause filesystem issues
+            dangerous_chars = ['<', '>', '|', '&', '?', '*', ':', '"', '\\']
+            path = parsed.path
+            
+            # Allow some regex chars in paths but reject obvious regex patterns
+            if any(char in path for char in dangerous_chars):
+                return False
+                
+            # Reject URLs that look like regex patterns
+            regex_indicators = [r'\[', r'\]', r'\(', r'\)', r'\^', r'\$', r'\+', r'\*', r'\?']
+            if any(indicator in path for indicator in regex_indicators):
+                return False
+                
+            # Reject URLs that are too long (likely malformed)
+            if len(url) > 2000:
+                return False
+                
+            return True
+        except Exception:
+            return False
+    
     def start_scan(self):
         """
         Start the scanning process
@@ -431,6 +468,44 @@ class WebScanner:
         
         return discovered_urls
     
+    def sanitize_filename(self, filename):
+        """
+        Sanitize filename by removing or replacing dangerous characters
+        
+        Args:
+            filename (str): Original filename
+            
+        Returns:
+            str: Sanitized filename safe for filesystem
+        """
+        # Characters that are invalid in Windows filenames
+        invalid_chars = ['<', '>', ':', '"', '|', '?', '*', '\\', '/']
+        # Additional problematic chars for URLs that became filenames
+        problematic_chars = ['[', ']', '(', ')', '^', '$', '+', '&', '%']
+        
+        sanitized = filename
+        
+        # Replace invalid chars with underscore
+        for char in invalid_chars + problematic_chars:
+            sanitized = sanitized.replace(char, '_')
+        
+        # Remove multiple underscores
+        while '__' in sanitized:
+            sanitized = sanitized.replace('__', '_')
+            
+        # Remove leading/trailing underscores and dots
+        sanitized = sanitized.strip('_.')
+        
+        # Ensure it's not empty
+        if not sanitized:
+            sanitized = "unknown"
+            
+        # Limit length to avoid filesystem issues
+        if len(sanitized) > 200:
+            sanitized = sanitized[:200]
+            
+        return sanitized
+    
     def get_file_path(self, url):
         """
         Generate a file path from a URL
@@ -446,6 +521,9 @@ class WebScanner:
         # Get the path from the URL
         path = parsed_url.path
         
+        # Sanitize the path to prevent filesystem issues
+        path = self.sanitize_filename(path)
+        
         # Handle empty paths or just '/'
         if not path or path == '/':
             path = '/index.html'
@@ -453,7 +531,7 @@ class WebScanner:
         # Add domain as subdirectory when downloading from external domains
         domain_dir = ''
         if parsed_url.netloc != self.base_domain:
-            domain_dir = parsed_url.netloc.replace(':', '_') + '/'
+            domain_dir = self.sanitize_filename(parsed_url.netloc.replace(':', '_')) + '/'
         
         file_path = os.path.join(self.download_dir, domain_dir, path.lstrip('/'))
 
@@ -693,10 +771,27 @@ class WebScanner:
         
         for pattern in patterns:
             for match in re.finditer(pattern, js_content):
-                url = match.group(1)
-                absolute_url = urljoin(base_url, url)
-                if self.should_process_url(absolute_url):
-                    discovered_urls.append(absolute_url)
+                try:
+                    # Handle patterns with multiple groups (like axios patterns)
+                    groups = match.groups()
+                    if len(groups) >= 2:
+                        # For patterns like axios with method and URL groups
+                        url = groups[-1]  # Take the last group as URL
+                    elif len(groups) == 1:
+                        url = groups[0]
+                    else:
+                        continue  # Skip if no capturing groups
+                        
+                    # Validate URL before processing
+                    if not url or not self.is_valid_url(urljoin(base_url, url)):
+                        continue
+                        
+                    absolute_url = urljoin(base_url, url)
+                    if self.should_process_url(absolute_url):
+                        discovered_urls.append(absolute_url)
+                except (IndexError, AttributeError) as e:
+                    # Skip malformed patterns
+                    continue
         
         # Special case: IntraWeb applications - if we see IntraWeb patterns, try /$/
         if 'IntraWeb' in js_content or 'IW_' in js_content or '/$/' in js_content:
@@ -731,10 +826,19 @@ class WebScanner:
         
         for pattern in patterns:
             for match in re.finditer(pattern, css_content):
-                url = match.group(1)
-                absolute_url = urljoin(base_url, url)
-                if self.should_process_url(absolute_url):
-                    discovered_urls.append(absolute_url)
+                try:
+                    url = match.group(1)
+                    
+                    # Validate URL before processing
+                    if not url or not self.is_valid_url(urljoin(base_url, url)):
+                        continue
+                        
+                    absolute_url = urljoin(base_url, url)
+                    if self.should_process_url(absolute_url):
+                        discovered_urls.append(absolute_url)
+                except (IndexError, AttributeError):
+                    # Skip malformed patterns
+                    continue
         
         return list(set(discovered_urls))
     

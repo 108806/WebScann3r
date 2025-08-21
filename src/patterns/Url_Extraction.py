@@ -9,7 +9,7 @@ js_url_patterns = [
     r'[\'\"]([/][a-zA-Z0-9_\-/\.]+)[\'\"]',  # Quoted paths
     r'fetch\([\'\"]([^\'\"]+)[\'\"]\)',  # fetch API calls
     r'xhr\.open\([\'\"]GET[\'\"], [\'\"]([^\'\"]+)[\'\"]',  # XHR requests
-    r'axios\.(get|post|put|delete|patch)\([\'\"]([^\'\"]+)[\'\"]',  # axios requests (all methods)
+    r'axios\.(get|post|put|delete|patch)\([\'\"]([^\'\"]+)[\'\"]',  # axios requests - group 2 is the URL
     r'\.ajax\(\{\s*url:\s*[\'\"]([^\'\"]+)[\'\"]',  # jQuery AJAX calls
     r'import\([\'\"]([^\'\"]+)[\'\"]\)',  # dynamic import()
     r'WebSocket\([\'\"]([^\'\"]+)[\'\"]\)',  # WebSocket URLs
@@ -23,7 +23,7 @@ js_url_patterns = [
     r'require\([\'\"]([^\'\"]+)[\'\"]\)',  # CommonJS require
     r'loadScript\([\'\"]([^\'\"]+)[\'\"]\)',  # Custom loadScript functions
     r'getScript\([\'\"]([^\'\"]+)[\'\"]\)',  # jQuery getScript
-    r'[\'\"]\s*/[^\'\"]*\.js[^\'\"]*\s*[\'\"]\s*[,\)]',  # JS file paths in arrays/function calls
+    r'[\'\"](\s*/[^\'\"]*\.js[^\'\"]*)\s*[\'\"]\s*[,\)]',  # JS file paths in arrays/function calls
     # AJAX and XHR patterns
     r'ajaxGet\(\s*[\'\"]([^\'\"]+)[\'\"]',  # Custom ajaxGet function calls
     r'get\(\s*[\'\"]([^\'\"]+)[\'\"]',  # Custom get function calls (like in our target)
