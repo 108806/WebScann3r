@@ -713,8 +713,9 @@ class WebScanner:
             for match in re.finditer(pattern, html_content):
                 url = match.group(1)
                 absolute_url = urljoin(base_url, url)
-                if self.should_process_url(absolute_url):
-                    js_css_urls.append(absolute_url)
+                # Validate URL before processing
+                if not url or not self.is_valid_url(urljoin(base_url, url)):
+                    continue
         discovered_urls.extend(js_css_urls)
         # Remove duplicates and return
         return list(set(discovered_urls))
@@ -1207,10 +1208,10 @@ class WebScanner:
                     entry_path = os.path.join(dir_path, entry)
                     is_last = i == len(entries) - 1
                     
-                    f.write(f"{prefix}{'└── ' if is_last else '├── '}{entry}\n")
+                    f.write(f"{prefix}{'+-- ' if is_last else '+-- '}{entry}\n")
                     
                     if os.path.isdir(entry_path):
-                        print_tree(entry_path, prefix + ('    ' if is_last else '│   '))
+                        print_tree(entry_path, prefix + ('    ' if is_last else '|   '))
             
             try:
                 print_tree(self.download_dir)

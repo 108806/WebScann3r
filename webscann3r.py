@@ -77,8 +77,8 @@ def main():
         
         print(f"\nScan completed successfully!")
         print(f"Results stored in: {scanner.target_dir}")
-        print(f"├── Downloaded files: {scanner.download_dir}")
-        print(f"└── Reports: {scanner.report_dir}")
+        print(f"+-- Downloaded files: {scanner.download_dir}")
+        print(f"+-- Reports: {scanner.report_dir}")
         
     except KeyboardInterrupt:
         print("\nScan interrupted by user.")

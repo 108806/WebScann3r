@@ -333,10 +333,10 @@ class Reporter:
                     entry_path = os.path.join(dir_path, entry)
                     is_last = i == len(entries) - 1
                     
-                    f.write(f"{prefix}{'└── ' if is_last else '├── '}{entry}\n")
+                    f.write(f"{prefix}{'+-- ' if is_last else '+-- '}{entry}\n")
                     
                     if os.path.isdir(entry_path):
-                        print_tree(entry_path, prefix + ('    ' if is_last else '│   '))
+                        print_tree(entry_path, prefix + ('    ' if is_last else '|   '))
             
             try:
                 print_tree(self.download_dir)

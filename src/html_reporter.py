@@ -939,12 +939,12 @@ class HTMLReporter:
             entry_path = os.path.join(dir_path, entry)
             is_last = i == len(entries) - 1
             
-            result += f"{prefix}{'└── ' if is_last else '├── '}{entry}\n"
+            result += f"{prefix}{'+-- ' if is_last else '+-- '}{entry}\n"
             
             if os.path.isdir(entry_path):
                 result += self._generate_site_structure(
                     entry_path, 
-                    prefix + ('    ' if is_last else '│   ')
+                    prefix + ('    ' if is_last else '|   ')
                 )
         
         return result
