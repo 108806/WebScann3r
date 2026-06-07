@@ -1,13 +1,12 @@
 # Patterns for Unrestricted File Upload (expanded and well-commented)
 unrestricted_file_upload_patterns = [
     # Common multipart/form-data and file upload indicators
-    r'(?i)multipart/form-data',
+    # bare "multipart/form-data" removed — matches any JS bundle with the MIME type string constant
     r'(?i)Content-Disposition: form-data; name=[\'\"]?file[\'\"]?',
-    r'(?i)upload\s*\(',
+    # upload\s*\( removed — too broad (any function named upload)
     r'(?i)file_upload',
     r'(?i)\bmove_uploaded_file\b',
-    r'(?i)\bopen\s*\(.*file',
-    r'(?i)\bwrite\s*\(.*file',
+    # open(.*file and write(.*file removed — match unrelated file I/O patterns
     r'(?i)saveAs\s*\(',
     r'(?i)storeAs\s*\(',
     r'(?i)copy\s*\(.*file',

@@ -50,7 +50,7 @@ insecure_crypto_patterns = [
     r'(?i)\bmd4\b',
     r'(?i)\bHAVAL\b',
     r'(?i)\bTiger\b',
-    # Hardcoded keys or IVs (generic)
-    r'(?i)key\s*=\s*[\'\"]?[A-Za-z0-9+/=]{8,}',
-    r'(?i)iv\s*=\s*[\'\"]?[A-Za-z0-9+/=]{8,}',
+    # Hardcoded keys or IVs — require quotes so "Key = function(...)" doesn't match
+    r'(?i)\bkey\s*=\s*[\'"][A-Za-z0-9+/=]{8,}[\'"]',
+    r'(?i)\biv\s*=\s*[\'"][A-Za-z0-9+/=]{8,}[\'"]',
 ]

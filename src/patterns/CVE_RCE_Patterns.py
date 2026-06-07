@@ -63,7 +63,7 @@ cve_rce_patterns = [
     r'(?i)child_process\.exec.*shell:.*true',
     r'(?i)require\(["\']child_process["\']\)\.exec\(',
     r'(?i)vm\.runInNewContext\(',
-    r'(?i)Function\(.*\)\(\)',
+    r'(?i)Function\s*\(\s*(?!["\']return\s+this["\'])[^\n)]*\)\s*\(\)',  # exclude "return this" polyfill
     
     # PHP specific RCE patterns (often via AJAX)
     r'(?i)assert\(.*\$_(?:GET|POST|REQUEST|COOKIE)',

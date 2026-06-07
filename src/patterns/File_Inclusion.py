@@ -7,7 +7,7 @@ file_inclusion_patterns = [
     r'(?i)new\s+FileReader\(.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS FileReader with user input
     r'(?i)fs\.readFile\(.*\+', # Node.js fs.readFile with concat
     r'(?i)java\.io\.File\(.*\+', # Java File with concat
-    r'(?i)open\(.*\+.*', # open() with concat
+    # open() with concat removed — too broad, matches XMLHttpRequest.open("GET", url + input)
     r'(?i)include\s*[\'\"]?\s*\$\w+', # include with variable
     r'(?i)require\s*[\'\"]?\s*\$\w+', # require with variable
     r'(?i)importlib\.import_module\s*\(\s*.*\)', # Python importlib with variable

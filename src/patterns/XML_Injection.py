@@ -17,8 +17,8 @@ xml_injection_patterns = [
     r'(?i)file:///etc/',
     r'(?i)file:///c:/',
 
-    # CDATA injection marker
-    r'(?i)<!\[CDATA\[.*\]\]>',
+    # CDATA pattern removed — JS XML-serialization libraries match it as a false positive
+    # (e.g. code that wraps text in CDATA tags as protection, not as injection)
 
     # Java/Python XML parsers explicitly enabling external entities
     r'(?i)setFeature\s*\([^)]*external[^)]*',
