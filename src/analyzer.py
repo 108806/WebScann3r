@@ -81,7 +81,6 @@ class SecurityAnalyzer:
             'Server-Side Template Injection (SSTI)': ssti_patterns,
             'Insecure Configuration': insecure_config_patterns,
             'Unrestricted File Upload': unrestricted_file_upload_patterns,
-            'Directory Listing Enabled': directory_listing_enabled_patterns,
             'Unvalidated Redirects': unvalidated_redirects_patterns,
             'CORS Misconfiguration': cors_misconfiguration_patterns,
             'Insecure HTTP Headers': insecure_http_header_patterns,
@@ -201,18 +200,24 @@ class SecurityAnalyzer:
             dict: Dictionary of security findings
         """
         logger.info("Starting detailed security analysis...")
-        
-        # Dictionary to store security findings
+
         security_findings = {}
-        
-        # Dictionary to store software/library versions
         detected_libraries = {}
-        
-        # Analyze each code file
-        for file_path, content in code_files.items():
+
+        total = len(code_files)
+        idx_w = len(str(total))
+        n_patterns = len(self.security_patterns)
+        print(f"\n[ANALYSIS] {total} file{'s' if total != 1 else ''}, {n_patterns} pattern categories")
+        print(f"{'-' * 60}")
+
+        for file_idx, (file_path, content) in enumerate(code_files.items(), 1):
+            file_name = os.path.basename(file_path)
+            kb = len(content) / 1024
+            # Print filename immediately so the user sees activity even before slow files finish
+            print(f"  [{file_idx:>{idx_w}}/{total}]  {file_name:<38}  {kb:6.1f} KB  ", end="", flush=True)
+
             file_findings = {}
             try:
-                # Check for security issues
                 for issue_type, patterns in self.security_patterns.items():
                     matches = []
                     for pattern in patterns:
@@ -220,12 +225,9 @@ class SecurityAnalyzer:
                             for match in re.finditer(pattern, content):
                                 line_number = content[:match.start()].count('\n') + 1
                                 code_lines = content.splitlines()
-                                # Get context (a few lines before and after)
                                 start_line = max(0, line_number - 3)
                                 end_line = min(len(code_lines), line_number + 3)
-                                context_lines = []
-                                for i in range(start_line, end_line):
-                                    context_lines.append(f"{i+1}: {code_lines[i]}")
+                                context_lines = [f"{j+1}: {code_lines[j]}" for j in range(start_line, end_line)]
                                 match_info = {
                                     'line': line_number,
                                     'code': code_lines[line_number - 1].strip(),
@@ -237,21 +239,14 @@ class SecurityAnalyzer:
                                     'mitigation': self.mitigation_recommendations.get(issue_type, [])
                                 }
                                 matches.append(match_info)
-                                # If this is a Software/Library Version finding, store the version
                                 if issue_type == 'Software/Library Versions' and len(match.groups()) > 0:
                                     library_name = match.group(0).split('-')[0].strip()
                                     version = match.group(1)
                                     detected_libraries[library_name] = version
                         except re.error as regex_err:
                             logger.error(f"Regex error in pattern for {issue_type}: {pattern}\nError: {regex_err}")
-                            import traceback
-                            traceback.print_exc()
-                            matches.append({'regex_error': str(regex_err), 'pattern': pattern})
                         except Exception as e:
                             logger.error(f"Unexpected error in pattern for {issue_type}: {pattern}\nError: {e}")
-                            import traceback
-                            traceback.print_exc()
-                            matches.append({'unexpected_error': str(e), 'pattern': pattern})
                     if matches:
                         file_findings[issue_type] = matches
             except Exception as file_exc:
@@ -259,9 +254,28 @@ class SecurityAnalyzer:
                 import traceback
                 traceback.print_exc()
                 file_findings['analyzer_error'] = str(file_exc)
+
+            # Print result on the same line
+            issue_count = sum(len(v) for v in file_findings.values() if isinstance(v, list))
+            if issue_count:
+                type_names = list(file_findings.keys())
+                types_str = ', '.join(type_names[:3])
+                if len(type_names) > 3:
+                    types_str += f" +{len(type_names) - 3} more"
+                print(f"  {issue_count} finding{'s' if issue_count > 1 else ''}: {types_str}")
+            else:
+                print("  clean")
+
             if file_findings:
                 security_findings[file_path] = file_findings
-        
+
+        n_findings = sum(
+            len(v) for fp, fi in security_findings.items()
+            if fp != '__summary__' and isinstance(fi, dict)
+            for v in fi.values() if isinstance(v, list)
+        )
+        print(f"{'-' * 60}")
+        print(f"[ANALYSIS] Done -- {n_findings} findings in {len(security_findings)} files\n")
         logger.info(f"Completed security analysis. Found issues in {len(security_findings)} files.")
         
         # Add summary data

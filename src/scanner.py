@@ -1019,21 +1019,26 @@ class WebScanner:
         Analyze downloaded code files for security issues and function usage
         """
         logger.info("Starting code analysis...")
-        print(f"Analyzing {len(self.code_files)} files...")
-        # Fix #13: progress is printed inside SecurityAnalyzer.analyze_code
         from .analyzer import SecurityAnalyzer
         analyzer = SecurityAnalyzer()
         security_findings = analyzer.analyze_code(self.code_files)
 
-        # Sink detection: look for dangerous function calls and taint sinks (for sinks.md)
-        # Deduplicate: only record first occurrence of each (file, sink_text) pair to avoid
-        # flooding the report with the same sink appearing hundreds of times in a minified bundle.
-        _seen_sinks = set()  # (file_path, normalised_sink_text)
-        for file_path, content in self.code_files.items():
-            # Count function calls in JS files
+        # ── Sink detection ─────────────────────────────────────────────────────
+        # Deduplicate by (file, sink_text) to avoid minified-bundle floods.
+        total_files = len(self.code_files)
+        idx_w = len(str(total_files))
+        print(f"[SINKS]    Scanning {total_files} file{'s' if total_files != 1 else ''} for dangerous sinks...")
+        _seen_sinks = set()
+        for file_idx, (file_path, content) in enumerate(self.code_files.items(), 1):
+            file_name = os.path.basename(file_path)
+            # Rolling progress line — overwritten each iteration for clean-file noise suppression
+            progress = f"  [{file_idx:>{idx_w}}/{total_files}]  Scanning {file_name}..."
+            print(f"{progress:<72}", end="\r", flush=True)
+
             extension = os.path.splitext(file_path)[1].lower()
             if extension == '.js':
                 self.count_js_function_calls(content)
+            file_sinks = []
             for sink_pat in sink_patterns:
                 for match in re.finditer(sink_pat, content):
                     sink_text = match.group(0).strip().rstrip('(').rstrip()
@@ -1049,9 +1054,19 @@ class WebScanner:
                         'sink': match.group(0),
                         'code': code_line
                     })
+                    file_sinks.append(sink_text)
 
-        # Extract JS library versions from downloaded file content
-        # (supplements the HTTP-header-only version detection)
+            if file_sinks:
+                # Overwrite the rolling progress line with a permanent finding line
+                unique_sinks = list(dict.fromkeys(file_sinks))
+                sink_labels = '  '.join(unique_sinks)
+                print(f"  [{file_idx:>{idx_w}}/{total_files}]  {file_name:<38}  {len(file_sinks)} sink{'s' if len(file_sinks) > 1 else ''}: {sink_labels[:52]}")
+
+        print(f"{' ' * 72}", end="\r")  # erase last rolling line
+        print(f"[SINKS]    Done -- {len(self.potential_sinks)} sink{'s' if len(self.potential_sinks) != 1 else ''} found\n")
+
+        # ── JS library version extraction ──────────────────────────────────────
+        print(f"[VERSIONS] Scanning JS/HTML files for library version strings...")
         _js_version_patterns = [
             (r'[Jj][Qq]uery\s+v(\d+\.\d+[\.\d]*)', 'jQuery'),
             (r'"jquery":\s*"(\d+\.\d+[\.\d]*)"', 'jQuery'),
@@ -1079,13 +1094,22 @@ class WebScanner:
                     self.detected_versions[f"JS: {lib_name}"] = m.group(1)
                     logger.info(f"Detected {lib_name} v{m.group(1)} in {file_path}")
 
-        # Generate security report using Reporter class (with improved formatting and Berlin time)
+        js_versions_found = {k: v for k, v in self.detected_versions.items() if k.startswith('JS:')}
+        if js_versions_found:
+            for lib, ver in js_versions_found.items():
+                print(f"           {lib}: {ver}")
+        print(f"[VERSIONS] Done -- {len(js_versions_found)} JS version{'s' if len(js_versions_found) != 1 else ''} detected\n")
+
+        # ── Report generation ──────────────────────────────────────────────────
+        print(f"[REPORTS]  Generating reports...")
         from .reporter import Reporter
         reporter = Reporter(self.target_url, report_dir=self.report_dir, download_dir=self.download_dir)
+        print(f"           security_report.md", end="  ", flush=True)
         reporter.generate_security_report(security_findings, url_map=self.file_url_map)
+        print(f"done")
 
-        # After generating the security report, also generate a sinks report if sinks exist
         if self.potential_sinks:
+            print(f"           sinks.md", end="  ", flush=True)
             # Sort sinks by score descending using the global sink_score_map loaded from JSON
             sorted_sinks = sorted(self.potential_sinks, key=lambda s: self.get_sink_score(s['sink']), reverse=True)
 
@@ -1110,12 +1134,21 @@ class WebScanner:
             security_report_path = os.path.join(self.report_dir, 'security_report.md')
             with open(security_report_path, 'a', encoding='utf-8') as f:
                 f.write("\n---\n**See [sinks.md](sinks.md) for a summary of potential sink findings.**\n\n")
-        # Generate function usage report
+            print(f"done")
+
+        print(f"           function_usage_report.md", end="  ", flush=True)
         self.generate_function_usage_report()
-        # Generate HTTP security headers report
+        print(f"done")
+
+        print(f"           http_headers_report.md", end="  ", flush=True)
         self.generate_headers_report()
-        # Generate forms inventory
+        print(f"done")
+
+        print(f"           forms_inventory.md", end="  ", flush=True)
         self.generate_forms_report()
+        print(f"done")
+
+        print(f"[REPORTS]  All reports written\n")
     
     def get_sink_score(self, sink_name):
         """
@@ -1337,7 +1370,7 @@ class WebScanner:
             if len(self.security_headers_issues) > 20:
                 f.write(f"*...{len(self.security_headers_issues) - 20} more URLs checked. See summary above.*\n")
 
-        print(f"[SUMMARY] HTTP headers report: {len(header_summary)} distinct issues across {len(self.security_headers_issues)} URLs")
+        logger.info(f"HTTP headers report: {len(header_summary)} distinct issues across {len(self.security_headers_issues)} URLs")
         logger.info(f"HTTP headers report generated: {report_path}")
 
     def generate_forms_report(self):
@@ -1378,7 +1411,7 @@ class WebScanner:
                     f.write(f"| `{inp['name']}` | {inp['type']} | {inp.get('id', '')} |\n")
                 f.write("\n")
 
-        print(f"[SUMMARY] Forms inventory: {len(unique_forms)} unique forms ({len(self.forms_found)} total incl. duplicates)")
+        logger.info(f"Forms inventory: {len(unique_forms)} unique forms ({len(self.forms_found)} total)")
         logger.info(f"Forms inventory generated: {report_path}")
 
     def generate_final_report(self):

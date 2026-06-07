@@ -247,8 +247,7 @@ class Reporter:
                             f.write(f"**Code:**\n```\n{snippet}\n```\n")
                             f.write("==================================================\n\n")
                             issue_num += 1
-        logger.info(f"Security report generated: {report_path}")
-        print(f"[SUMMARY] Security report issues: {issue_count}")
+        logger.info(f"Security report generated: {report_path} ({issue_count} issues)")
         return report_path
     
     def generate_function_usage_report(self, function_calls):
