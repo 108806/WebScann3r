@@ -24,8 +24,8 @@ file_inclusion_patterns = [
     r'(?i)java\.nio\.file\.Files\.newBufferedReader\s*\(\s*.*\)', # Java Files.newBufferedReader
     r'(?i)java\.nio\.file\.Files\.newInputStream\s*\(\s*.*\)', # Java Files.newInputStream
     r'(?i)java\.nio\.file\.Files\.readString\s*\(\s*.*\)', # Java Files.readString
-    r'(?i)path\.join\s*\(\s*.*\)', # Node.js path.join any input
-    r'(?i)path\.resolve\s*\(\s*.*\)', # Node.js path.resolve any input
+    r'(?i)\bpath\.join\s*\(\s*.*\)', # Node.js path.join (word boundary prevents fullPath.join FP)
+    r'(?i)\bpath\.resolve\s*\(\s*.*\)', # Node.js path.resolve (word boundary)
     r'(?i)os\.open\s*\(\s*.*\)', # Python os.open any input
     r'(?i)os\.fdopen\s*\(\s*.*\)', # Python os.fdopen any input
     r'(?i)os\.read\s*\(\s*.*\)', # Python os.read any input

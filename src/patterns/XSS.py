@@ -18,8 +18,9 @@ xss_patterns = [
     r'(?i)\.insertAdjacentHTML\s*\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
 
     # Dangerous URI schemes in attribute values — XSS payloads
-    # Exclude javascript:void(0) (placeholder) and javascript:__doPostBack (ASP.NET WebForms)
-    r'(?i)javascript\s*:(?!\s*(?:void[\s(]|__doPostBack))',
+    # Exclude: void(0), __doPostBack, space after colon (JS object property key like {javascript: true}),
+    # and quote immediately after colon (empty URL: e.src="javascript:")
+    r'(?i)javascript\s*:(?!(?:\s*(?:void[\s(]|__doPostBack)|["\'\s]))',
     r'(?i)data:text/html',
     r'(?i)vbscript\s*:',
 
@@ -32,9 +33,8 @@ xss_patterns = [
     r'(?i)<iframe[^>]+srcdoc\s*=',
     r'(?i)src\s*=\s*["\']data:text/html',
 
-    # React dangerous prop
-    r'(?i)dangerouslySetInnerHTML',
+    # dangerouslySetInnerHTML covered by Use_of_Dangerous_Functions — removed here to avoid duplicate
 
-    # window.opener — opener-based XSS (specific enough)
+    # window.opener — opener-based XSS (reverse tabnapping, specific enough)
     r'(?i)window\.opener\s*\.',
 ]
