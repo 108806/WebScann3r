@@ -1,44 +1,40 @@
-# Patterns for Cross-Site Scripting (XSS) (expanded and well-commented)
+# Patterns for Cross-Site Scripting (XSS)
+# Strategy: require user-input context ($_ vars) where possible.
+# Removed: window.name/parent/top/frames/self/opener (normal DOM access),
+# ${...} (every ES6 template literal), {{...}} (normal Angular/Handlebars),
+# <%...%> (normal server templates — covered by SSTI patterns).
+
 xss_patterns = [
-    r'(?i)document\.write\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS document.write with user input
-    r'(?i)\.innerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS innerHTML with user input
-    r'(?i)\.outerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS outerHTML with user input
-    r'(?i)eval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS eval with user input
-    r'(?i)setTimeout\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS setTimeout with user input
-    r'(?i)setInterval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS setInterval with user input
-    r'(?i)new\s+Function\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS Function() with user input
-    r'(?i)\.innerText\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # JS innerText with user input
-    r'(?i)document\.body\.appendChild\(.*\$_(?:GET|POST|REQUEST|COOKIE)', # appendChild with user input
-    r'(?i)\.insertAdjacentHTML\(.*\$_(?:GET|POST|REQUEST|COOKIE)', # insertAdjacentHTML with user input
-    # r'(?i)window\.location\s*=\s*.*', # JS window.location assignment (commented: too broad)
-    # r'(?i)document\.(?:URL|cookie|domain|referrer)', # JS document properties (commented: too broad)
-    # r'(?i)on\w+\s*=\s*["\'][^"\']*["\']', # Inline event handlers (commented: too broad)
-    # r'(?i)\\bon[a-z]+\s*=\s*["\'][^"\']*["\']', # Any on* event handler (commented: too broad)
-    # r'(?i)<script[\\s\\S]*?>[\\s\\S]*?<\\/script>', # script tag XSS (commented: too broad)
-    # r'(?i)<iframe[\\s\\S]*?>[\\s\\S]*?<\\/iframe>', # iframe tag XSS (commented: too broad)
-    # r'(?i)<svg[\\s\\S]*?>[\\s\\S]*?<\\/svg>', # SVG tag XSS (commented: too broad)
-    # r'(?i)<math[\\s\\S]*?>[\\s\\S]*?<\\/math>', # MathML tag XSS (commented: too broad)
-    r'(?i)<img[\s\S]*?onerror\s*=\s*["\"][^"\"]*["\"]', # img onerror XSS
-    r'(?i)<body[\s\S]*?onload\s*=\s*["\"][^"\"]*["\"]', # body onload XSS
-    r'(?i)\{\{.*\}\}', # Template injection (Handlebars, etc.)
-    r'(?i)<%=?\s*.*%>', # Template injection (EJS, etc.)
-    r'(?i)\$\{.*\}', # Template injection (ES6, etc.)
-    r'(?i)javascript:', # javascript: URI
-    r'(?i)data:text/html', # data: URI
-    r'(?i)vbscript:', # vbscript: URI
-    r'(?i)expression\s*\(', # CSS expression()
-    r'(?i)document\.location', # document.location
-    r'(?i)location\.hash', # location.hash
-    r'(?i)window\.name', # window.name
-    r'(?i)window\.open\s*\(', # window.open()
-    r'(?i)window\.parent', # window.parent
-    r'(?i)window\.top', # window.top
-    r'(?i)window\.frames', # window.frames
-    r'(?i)window\.self', # window.self
-    r'(?i)window\.opener', # window.opener
-    r'(?i)window\.frameElement', # window.frameElement
-    r'(?i)window\.content', # window.content
-    r'(?i)window\.external', # window.external
-    r'(?i)<iframe[^>]+srcdoc=', # iframe srcdoc attribute
-    r'(?i)src\s*=\s*["\']data:text/html', # src=data:text/html
+    # PHP user input directly reaching sinks — high confidence
+    r'(?i)document\.write\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)\.innerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)\.outerHTML\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)eval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)setTimeout\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)setInterval\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)new\s+Function\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)\.innerText\s*=\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)document\.body\.appendChild\s*\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
+    r'(?i)\.insertAdjacentHTML\s*\(.*\$_(?:GET|POST|REQUEST|COOKIE)',
+
+    # Dangerous URI schemes in attribute values — XSS payloads
+    # Exclude javascript:void(0) (placeholder) and javascript:__doPostBack (ASP.NET WebForms)
+    r'(?i)javascript\s*:(?!\s*(?:void[\s(]|__doPostBack))',
+    r'(?i)data:text/html',
+    r'(?i)vbscript\s*:',
+
+    # CSS expression — IE legacy XSS
+    r'(?i)expression\s*\(',
+
+    # Actual XSS payload markers in HTML attributes
+    r'(?i)<img[\s\S]*?onerror\s*=\s*["\'][^"\']*["\']',
+    r'(?i)<body[\s\S]*?onload\s*=\s*["\'][^"\']*["\']',
+    r'(?i)<iframe[^>]+srcdoc\s*=',
+    r'(?i)src\s*=\s*["\']data:text/html',
+
+    # React dangerous prop
+    r'(?i)dangerouslySetInnerHTML',
+
+    # window.opener — opener-based XSS (specific enough)
+    r'(?i)window\.opener\s*\.',
 ]

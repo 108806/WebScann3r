@@ -1,123 +1,68 @@
-# Patterns for Use of Dangerous Functions (expanded and well-commented)
-use_of_dangerous_functions_patterns = [
-    # Python
-    r'(?i)eval\(',
-    r'(?i)exec\(',
-    r'(?i)execfile\(',
-    r'(?i)input\(',
-    r'(?i)os\.system\(',
-    r'(?i)os\.popen\(',
-    r'(?i)os\.popen2\(',
-    r'(?i)os\.popen3\(',
-    r'(?i)os\.popen4\(',
-    r'(?i)subprocess\.Popen\(',
-    r'(?i)subprocess\.call\(',
-    r'(?i)subprocess\.run\(',
-    r'(?i)subprocess\.check_output\(',
-    r'(?i)subprocess\.getoutput\(',
-    r'(?i)subprocess\.getstatusoutput\(',
-    r'(?i)pickle\.loads\(',
-    r'(?i)pickle\.load\(',
-    r'(?i)cPickle\.loads\(',
-    r'(?i)cPickle\.load\(',
-    r'(?i)shelve\.open\(',
-    r'(?i)marshal\.loads\(',
-    r'(?i)marshal\.load\(',
-    r'(?i)yaml\.load\(',
-    r'(?i)xml\.etree\.ElementTree\.fromstring\(',
-    r'(?i)xml\.etree\.ElementTree\.parse\(',
-    r'(?i)ast\.literal_eval\(',
-    r'(?i)os\.execl\(',
-    r'(?i)os\.execle\(',
-    r'(?i)os\.execlp\(',
-    r'(?i)os\.execlpe\(',
-    r'(?i)os\.execv\(',
-    r'(?i)os\.execve\(',
-    r'(?i)os\.execvp\(',
-    r'(?i)os\.execvpe\(',
-    r'(?i)os\.startfile\(',
-    # PHP
-    r'(?i)system\(',
-    r'(?i)shell_exec\(',
-    r'(?i)exec\(',
-    r'(?i)passthru\(',
-    r'(?i)popen\(',
-    r'(?i)proc_open\(',
-    r'(?i)assert\(',
-    r'(?i)base64_decode\(',
-    r'(?i)unserialize\(',
-    r'(?i)create_function\(',
-    r'(?i)eval\(',
-    r'(?i)preg_replace\(.*/e.*\)',
-    r'(?i)include\(',
-    r'(?i)include_once\(',
-    r'(?i)require\(',
-    r'(?i)require_once\(',
-    r'(?i)call_user_func\(',
-    r'(?i)call_user_func_array\(',
-    r'(?i)dl\(',
-    r'(?i)file_get_contents\(',
-    r'(?i)file_put_contents\(',
-    r'(?i)fopen\(',
-    r'(?i)fwrite\(',
-    r'(?i)readfile\(',
-    r'(?i)copy\(',
-    r'(?i)move_uploaded_file\(',
-    # JavaScript/Node.js
-    r'(?i)eval\(',
-    # r'(?i)Function\(', # Commented: too broad, causes false positives on common function usage
-    r'(?i)setTimeout\(',
-    r'(?i)setInterval\(',
-    r'(?i)document\.write\(',
-    r'(?i)document\.writeln\(',
-    # r'(?i)innerHTML\s*=', # Commented: too broad, causes false positives on any assignment to innerHTML
-    r'(?i)outerHTML\s*=',
-    r'(?i)window\.execScript\(',
-    r'(?i)window\.setTimeout\(',
-    r'(?i)window\.setInterval\(',
-    r'(?i)child_process\.exec\(',
-    r'(?i)child_process\.execSync\(',
-    r'(?i)child_process\.spawn\(',
-    r'(?i)child_process\.spawnSync\(',
-    r'(?i)child_process\.fork\(',
-    r'(?i)require\s*\(\s*["\']child_process["\']\s*\)',
-    r'(?i)dangerouslySetInnerHTML',
-    # Java
-    r'(?i)Runtime\.getRuntime\(\)\.exec\(',
-    r'(?i)ProcessBuilder\(',
-    r'(?i)ObjectInputStream\.readObject\(',
-    r'(?i)ScriptEngineManager\(',
-    r'(?i)javax\.script\.ScriptEngine\(',
-    r'(?i)Class\.forName\(',
-    r'(?i)Method\.invoke\(',
-    # Ruby
-    r'(?i)eval\s*\(',
-    r'(?i)instance_eval\s*\(',
-    r'(?i)class_eval\s*\(',
-    r'(?i)module_eval\s*\(',
-    r'(?i)send\s*\(',
-    r'(?i)system\s*\(',
-    r'(?i)exec\s*\(',
-    # r'(?i)open\s*\(',  # Removed: too broad, catches DOM API
-    r'(?i)IO\.popen\s*\(',
-    r'(?i)Kernel\.eval\s*\(',
-    r'(?i)Kernel\.system\s*\(',
-    r'(?i)Kernel\.exec\s*\(',
-    r'(?i)Kernel\.open\s*\(',
-    # C/C++
-    r'(?i)system\s*\(',
-    r'(?i)popen\s*\(',
-    r'(?i)execv\s*\(',
-    r'(?i)execvp\s*\(',
-    r'(?i)execl\s*\(',
-    r'(?i)execlp\s*\(',
-    r'(?i)fork\s*\(',
-    r'(?i)dlopen\s*\(',
-    r'(?i)LoadLibrary\s*\(',
-    r'(?i)GetProcAddress\s*\(',
-    # Misc
-    r'(?i)dangerouslyAllowAnyOrigin',
-    r'(?i)dangerouslyAllowAnyMethod',
-    r'(?i)dangerouslyAllowAnyHeader',
-]
+# Patterns for Use of Dangerous Functions
+# Strategy: flag functions that are inherently dangerous regardless of input,
+# or that indicate code/command execution and unsafe deserialization.
+# Removed: setTimeout, setInterval, input(), require(), include(), fopen(),
+# fwrite(), copy(), file_get_contents(), send(), fork(), assert(), base64_decode(),
+# system() standalone — these are legitimate in virtually all web applications.
 
+use_of_dangerous_functions_patterns = [
+    # Python/JS: code execution (negative lookbehind excludes .eval() .exec() method calls)
+    r'(?i)(?<!\.)\beval\s*\(',
+    r'(?i)(?<!\.)\bexec\s*\(',
+    r'(?i)\bexecfile\s*\(',
+    r'(?i)\bos\.system\s*\(',
+    r'(?i)\bos\.popen\s*\(',
+    r'(?i)\bos\.popen[234]\s*\(',
+    r'(?i)\bos\.execl[ep]?\s*\(',
+    r'(?i)\bos\.execv[ep]?\s*\(',
+    r'(?i)\bos\.startfile\s*\(',
+
+    # Python: subprocess — command execution
+    r'(?i)\bsubprocess\.Popen\s*\(',
+    r'(?i)\bsubprocess\.call\s*\(',
+    r'(?i)\bsubprocess\.run\s*\(',
+    r'(?i)\bsubprocess\.check_output\s*\(',
+    r'(?i)\bsubprocess\.getoutput\s*\(',
+    r'(?i)\bsubprocess\.getstatusoutput\s*\(',
+
+    # Python: unsafe deserialization
+    r'(?i)\bpickle\.loads?\s*\(',
+    r'(?i)\bcPickle\.loads?\s*\(',
+    r'(?i)\bmarshal\.loads?\s*\(',
+    r'(?i)\byaml\.load\s*\(',           # safe alternative is yaml.safe_load
+
+    # PHP: code/command execution
+    r'(?i)\bshell_exec\s*\(',
+    r'(?i)\bpassthru\s*\(',
+    r'(?i)\bproc_open\s*\(',
+    r'(?i)\bcreate_function\s*\(',       # deprecated PHP eval wrapper
+    r'(?i)\bunserialize\s*\(',           # PHP unsafe deserialization
+    r'(?i)preg_replace\s*\([^,]+/e',    # eval flag in preg_replace
+
+    # Node.js: child process execution
+    r'(?i)\bchild_process\.exec\s*\(',
+    r'(?i)\bchild_process\.execSync\s*\(',
+    r'(?i)\bchild_process\.spawn\s*\(',
+    r'(?i)\bchild_process\.spawnSync\s*\(',
+    r'(?i)\bchild_process\.fork\s*\(',
+    r'(?i)require\s*\(\s*["\']child_process["\']\s*\)',
+
+    # React: dangerous HTML injection
+    r'(?i)dangerouslySetInnerHTML',
+    r'(?i)dangerouslyAllowAny(?:Origin|Method|Header)',
+
+    # Java: code/command execution
+    r'(?i)Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(',
+    r'(?i)\bObjectInputStream\s*\(\s*.*\)\s*\.readObject\s*\(',
+    r'(?i)\bScriptEngineManager\s*\(',
+    r'(?i)javax\.script\.ScriptEngine\b',
+
+    # Ruby: code/command execution and eval (eval already covered above, skip duplicate)
+    r'(?i)(?<!\.)\binstance_eval\s*\(',
+    r'(?i)\bclass_eval\s*\(',
+    r'(?i)\bmodule_eval\s*\(',
+    r'(?i)\bKernel\.eval\s*\(',
+    r'(?i)\bKernel\.system\s*\(',
+    r'(?i)\bKernel\.open\s*\(',
+    r'(?i)\bIO\.popen\s*\(',
+]

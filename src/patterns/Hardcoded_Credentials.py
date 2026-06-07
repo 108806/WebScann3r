@@ -24,14 +24,15 @@ hardcoded_credentials_patterns = [
     r'(?i)ftp://[^:]+:[^@]+@', # FTP URI with creds
     r'(?i)smtp://[^:]+:[^@]+@', # SMTP URI with creds
     r'(?i)git://[^:]+:[^@]+@', # Git URI with creds
-    r'(?i)http[s]?://[^:]+:[^@]+@', # HTTP URI with creds
-    r'(?i)"auth"\s*:\s*"[^"]+"', # JSON auth field
-    r'(?i)"password"\s*:\s*"[^"]+"', # JSON password field
-    r'(?i)"token"\s*:\s*"[^"]+"', # JSON token field
-    r'(?i)"secret"\s*:\s*"[^"]+"', # JSON secret field
-    r'(?i)"api_key"\s*:\s*"[^"]+"', # JSON api_key field
-    r'(?i)"apikey"\s*:\s*"[^"]+"', # JSON apikey field
-    r'(?i)\.env', # .env file
+    r'(?i)https?://[^\s:@]+:[^\s:@]+@[^\s]+', # HTTP URI with embedded creds (user:pass@host)
+    r'(?i)"auth"\s*:\s*"[^"]{8,}"', # JSON auth field (min 8 chars to exclude "type" metadata)
+    r'(?i)"password"\s*:\s*"[^"]{8,}"', # JSON password field (min 8 chars)
+    r'(?i)"token"\s*:\s*"[^"]{8,}"', # JSON token field (min 8 chars)
+    r'(?i)"secret"\s*:\s*"[^"]{8,}"', # JSON secret field (min 8 chars)
+    r'(?i)"api_key"\s*:\s*"[^"]{8,}"', # JSON api_key field (min 8 chars)
+    r'(?i)"apikey"\s*:\s*"[^"]{8,}"', # JSON apikey field (min 8 chars)
+    r'(?i)require\s*\([\'"][^\'\"]*\.env[\'\"]\)', # require('.env') — loading .env config file
+    r'(?i)dotenv\.config\s*\(', # dotenv.config() — loading .env config
     r'(?i)AWS_ACCESS_KEY_ID\s*=\s*[A-Z0-9]{20}', # AWS_ACCESS_KEY_ID env
     r'(?i)AWS_SECRET_ACCESS_KEY\s*=\s*[A-Za-z0-9/+=]{40}', # AWS_SECRET_ACCESS_KEY env
 ]

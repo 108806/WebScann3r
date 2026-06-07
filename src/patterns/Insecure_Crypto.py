@@ -19,8 +19,7 @@ insecure_crypto_patterns = [
     r'(?i)\bXTEA\b',  # Use of XTEA
     r'(?i)\bARC4\b',  # Use of ARC4
     # Insecure modes
-    r'(?i)ECB',  # Use of ECB mode
-    r'(?i)CBC',  # Use of CBC mode (sometimes insecure if not used with random IV)
+    r'(?i)\bECB\b',  # ECB mode — always insecure (no IV), word boundary avoids mid-word match
     # Insecure/unsalted random
     r'(?i)no\s*salt',  # No salt used
     r'(?i)random\.seed\(',  # Predictable random seed
@@ -47,10 +46,10 @@ insecure_crypto_patterns = [
     r'(?i)use\s+of\s+weak\s+hash',
     r'(?i)use\s+of\s+weak\s+cipher',
     # Deprecated/legacy algorithms
-    r'(?i)md2',
-    r'(?i)md4',
-    r'(?i)HAVAL',
-    r'(?i)Tiger',
+    r'(?i)\bmd2\b',
+    r'(?i)\bmd4\b',
+    r'(?i)\bHAVAL\b',
+    r'(?i)\bTiger\b',
     # Hardcoded keys or IVs (generic)
     r'(?i)key\s*=\s*[\'\"]?[A-Za-z0-9+/=]{8,}',
     r'(?i)iv\s*=\s*[\'\"]?[A-Za-z0-9+/=]{8,}',

@@ -1,7 +1,8 @@
 # Patterns for Command Injection (expanded and well-commented)
 command_injection_patterns = [
     r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # PHP functions with user input
-    r'(?i)(?:exec|shell_exec|system|passthru|popen|proc_open)\s*\(\s*.*\+', # PHP functions with concat
+    # exec() with concat — require NOT preceded by dot to exclude JS RegExp.exec() method calls
+    r'(?i)(?<!\.)(?:shell_exec|system|passthru|popen|proc_open)\s*\(\s*.*\+', # PHP functions (not exec to avoid JS conflict)
     r'(?i)spawn\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)', # spawn with user input
     r'(?i)child_process\.exec\s*\(\s*.*\+', # Node.js exec with concat
     r'(?i)Runtime\.getRuntime\(\)\.exec\(.*\+', # Java exec with concat
@@ -14,7 +15,8 @@ command_injection_patterns = [
     r'(?i)child_process\.(?:exec|spawn|execFile)\s*\(\s*.*\)', # Node.js exec/spawn/execFile
     r'(?i)Runtime\.getRuntime\(\)\.exec\s*\(\s*.*\)', # Java exec any input
     r'(?i)ProcessBuilder\s*\(\s*.*\)', # Java ProcessBuilder any input
-    r'(?i)\`[^\`]+\`', # Shell backticks
+    # Shell backtick execution — only in PHP context (JS uses backticks for template literals)
+    r'(?i)(?:=|return|echo)\s*\`[^\`\n]{5,}\`', # PHP shell backtick: $out = `command`
     r'(?i)%x\{[^}]+\}', # Ruby %x{} shell
     r'(?i)IO\.popen\s*\(\s*.*\)', # Ruby IO.popen
     # r'(?i)popen\s*\(\s*.*\)', # popen any input (commented: too broad, not always dangerous)

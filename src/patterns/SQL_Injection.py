@@ -9,7 +9,8 @@ sql_injection_patterns = [
     r'(?i)(?:mysql|mysqli|pdo)_query\s*\(\s*.*\$_(?:GET|POST|REQUEST|COOKIE)',
     r'(?i)(?:query|prepare)\(\s*["\'](?:SELECT|INSERT|UPDATE|DELETE).*$',
     r'(?i)\.executeQuery\(\s*["\'](?:SELECT|INSERT|UPDATE|DELETE).*[+]',
-    r'(?i)cursor\.execute\s*\(\s*f?["\'][^\)]+%[a-zA-Z]|\.format',  # Only .format and %
+    r'(?i)cursor\.execute\s*\(\s*f?["\'][^\)]+%[a-zA-Z]',  # Python cursor.execute with % format string
+    r'(?i)cursor\.execute\s*\(\s*["\'][^"\']+["\']\.format\s*\(',  # Python cursor.execute with .format()
     r'(?i)\\bselect\\b.*\\bfrom\\b.*\\bwhere\\b.*[=><]\s*\\?.*',
     # DB-specific functions (these are rarely false positives)
     r'(?i)pg_sleep\s*\(',

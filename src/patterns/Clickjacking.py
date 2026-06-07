@@ -6,10 +6,6 @@ clickjacking_patterns = [
     r'response\.headers\s*\[\s*["\']X-Frame-Options["\']\s*\]\s*=\s*["\']?[^\'\"]*',
     # Content-Security-Policy header missing frame-ancestors directive
     r'(?i)Content-Security-Policy\s*[:=]\s*(?!.*frame-ancestors)',
-    # HTML <iframe> tag without sandbox or allow attributes (potential clickjacking vector)
-    r'<iframe(?![^>]*(sandbox|allow))',
-    # Usage of window.open with untrusted URLs (can be abused for UI redress)
-    r'window\.open\s*\(',
-    # Usage of document.domain (can be abused for frame busting bypass)
-    r'document\.domain',
+    # document.domain assignment — can be used to bypass frame-busting checks
+    r'document\.domain\s*=',
 ]

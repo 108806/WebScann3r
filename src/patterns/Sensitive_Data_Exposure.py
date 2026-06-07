@@ -37,71 +37,71 @@ sensitive_data_exposure_patterns = [
     # TLDR: Detects certificate signing requests
     r'(?i)BEGIN NEW CERTIFICATE REQUEST',
     # TLDR: Detects password assignments
-    r'(?i)password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)password\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects passwd assignments
-    r'(?i)passwd\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)passwd\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects pwd assignments
-    r'(?i)pwd\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)pwd\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects secret assignments
-    r'(?i)secret\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)secret\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects api_key assignments
-    r'(?i)api[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)api[_-]?key\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects apikey assignments
-    r'(?i)apikey\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)apikey\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects access_key assignments
-    r'(?i)access[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)access[_-]?key\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects secret_key assignments
-    r'(?i)secret[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)secret[_-]?key\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects client_secret assignments
-    r'(?i)client[_-]?secret\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)client[_-]?secret\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects access_token assignments
-    r'(?i)access[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)access[_-]?token\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects auth_token assignments
-    r'(?i)auth[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)auth[_-]?token\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects refresh_token assignments
-    r'(?i)refresh[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)refresh[_-]?token\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects Bearer tokens
     r'(?i)bearer\s+[A-Za-z0-9\-_\.]+',
     # TLDR: Detects JWT tokens
     r'(?i)jwt\s*[:=]\s*[\'\"]?eyJ[A-Za-z0-9\-_\.]+',
     # TLDR: Detects session_id assignments
-    r'(?i)session[_-]?id\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)session[_-]?id\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects auth_cookie assignments
-    r'(?i)auth[_-]?cookie\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)auth[_-]?cookie\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects cookie assignments
-    r'(?i)cookie\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)cookie\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects user_password assignments
-    r'(?i)user[_-]?password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)user[_-]?password\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects user_secret assignments
-    r'(?i)user[_-]?secret\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)user[_-]?secret\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects user_token assignments
-    r'(?i)user[_-]?token\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)user[_-]?token\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects user_key assignments
-    r'(?i)user[_-]?key\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)user[_-]?key\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects db_password assignments
-    r'(?i)db[_-]?password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)db[_-]?password\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects db_user assignments
-    r'(?i)db[_-]?user\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)db[_-]?user\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects db_host assignments
-    r'(?i)db[_-]?host\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)db[_-]?host\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects db_name assignments
-    r'(?i)db[_-]?name\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)db[_-]?name\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects db_connection assignments
-    r'(?i)db[_-]?connection\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)db[_-]?connection\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects db_conn assignments
-    r'(?i)db[_-]?conn\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)db[_-]?conn\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects database_password assignments
-    r'(?i)database[_-]?password\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)database[_-]?password\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects database_user assignments
-    r'(?i)database[_-]?user\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)database[_-]?user\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects database_host assignments
-    r'(?i)database[_-]?host\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)database[_-]?host\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects database_name assignments
-    r'(?i)database[_-]?name\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)database[_-]?name\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects database_connection assignments
-    r'(?i)database[_-]?connection\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)database[_-]?connection\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects database_conn assignments
-    r'(?i)database[_-]?conn\s*[:=]\s*[\'\"]?[^\'\"]{6,}[\'\"]?',
+    r'(?i)database[_-]?conn\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects AWS Access Key IDs
     r'(?i)AKIA[0-9A-Z]{16}',
     # TLDR: Detects AWS Temporary Access Keys
@@ -109,11 +109,11 @@ sensitive_data_exposure_patterns = [
     # TLDR: Detects AWS Root Access Keys
     r'(?i)A3T[A-Z0-9]{16}',
     # TLDR: Detects AWS secret access key assignments
-    r'(?i)aws_secret_access_key\s*[:=]\s*[\'\"]?[^\'\"]{20,}[\'\"]?',
+    r'(?i)aws_secret_access_key\s*[:=]\s*[\'\"][^\'\"]{20,}[\'\"]',
     # TLDR: Detects AWS access key ID assignments
-    r'(?i)aws_access_key_id\s*[:=]\s*[\'\"]?[^\'\"]{16,}[\'\"]?',
+    r'(?i)aws_access_key_id\s*[:=]\s*[\'\"][^\'\"]{16,}[\'\"]',
     # TLDR: Detects AWS session token assignments
-    r'(?i)aws_session_token\s*[:=]\s*[\'\"]?[^\'\"]{20,}[\'\"]?',
+    r'(?i)aws_session_token\s*[:=]\s*[\'\"][^\'\"]{20,}[\'\"]',
     # TLDR: Detects Google API keys
     r'(?i)AIza[0-9A-Za-z\-_]{35}',
 ]
