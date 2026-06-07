@@ -9,199 +9,168 @@
                                                              
 ```
 
-A comprehensive web reconnaissance tool for red team assessments. This tool scans and maps a website before an attack phase, helping security professionals to understand the attack surface of a target.
+A web reconnaissance and static analysis tool for red team assessments. Crawls a target, downloads code files, runs 37 vulnerability pattern categories against them, and produces a suite of pentester-ready reports.
 
 ## Features
 
-- **Web Crawling**: Recursively crawls the target website to discover pages and endpoints
-- **Resource Mapping**: Creates a directory structure that mirrors the website's organization
-- **File Downloading**: Downloads code files (.js, .php, .css, .html) for analysis
-- **Deep Analysis**: Scans JavaScript files for additional links and resources
-- **Security Analysis**: Checks for potentially dangerous code and security issues
-- **Function Usage Tracking**: Reports on how frequently each function is used across the codebase
-- **API Endpoint Detection**: Automatically identifies and catalogs API endpoints and routes
-- **Technology Stack Identification**: Detects software versions and creates a technology profile
-- **Domain Scope Control**: Option to limit scanning to the target domain or include external domains
-- **Media Filtering**: Option to skip media files (images, videos) to save space and time
-- **Comprehensive Reporting**: Generates detailed reports of the scan findings and security issues
-- **JSON Data Exports**: Provides structured JSON files for integration with other tools
-- **JSON Dump**: Creates a structured JSON file with all discovered files and directories
-- **Target Organization**: Organizes all outputs by target site in a structured directory layout
-- **Automatic Code Beautification**: All downloaded `.js`, `.html`, and `.css` files are automatically beautified/pretty-printed before analysis and reporting, making security findings easier to review and learn from.
-- **Comprehensive Pattern Documentation**: All vulnerability patterns are now well-documented, with clear descriptions, risk levels, OWASP categories, and mitigation guidance for educational value.
-- **Improved URL Handling**: URLs missing a scheme (http/https) are now auto-corrected and a warning is shown in the CLI.
-- **Better Error Reporting**: Improved error and warning messages for file handling and BeautifulSoup parsing.
-- **Robustness**: Type checks and error handling improved for HTML parsing and code analysis.
+### Crawling & Discovery
+- **Recursive web crawler** with configurable depth and thread count
+- **Multi-domain scope control** — stay on target or follow external links
+- **Form extraction** — collects every HTML form (action, method, inputs) during crawl
+- **JavaScript redirect following** — detects and queues `window.location` redirects
+- **Automatic code beautification** — minified JS/HTML/CSS is pretty-printed before analysis, making findings readable
+- **Version fingerprinting** — detects server software from HTTP headers and library versions (jQuery, React, Bootstrap, Swagger UI, etc.) from JS file content
 
-## Changelog (Recent Major Improvements)
+### Security Analysis
+- **37 vulnerability pattern categories** covering OWASP Top 10 and beyond:
+  SQLi, XSS, Open Redirect, CSRF, RCE, File Inclusion, Path Traversal, XXE,
+  Prototype Pollution, Insecure Crypto, Hardcoded Credentials, SSRF, SSTI,
+  Deserialization, and more
+- **Dangerous sink detection** — identifies taint sinks (eval, exec, innerHTML, SQL queries, file ops, LDAP, JWT, etc.) with priority scoring for fuzzing
+- **False-positive reduction** — word boundaries, negative lookaheads, and quote requirements baked into every pattern to minimise noise
+- **Finding deduplication** — identical matches in minified bundles are reported once, not hundreds of times
 
-- Beautified code is now used for all analysis and reporting (not just saved to disk).
-- Security pattern coverage and documentation improved for all major vulnerability types.
-- CLI and reporting usability enhancements.
+### Reporting
+- **10 reports per scan** — see full list below
+- **URL annotations** — every security finding shows the live URL alongside the local file name
+- **Dynamic recommendations** — final report recommendations are derived from actual finding types, not boilerplate
+- **Severity-sorted header audit** — HTTP security headers checked across every crawled URL
+
+## Reports
+
+Each scan produces a timestamped directory under `targets/`. All reports are inside `reports/`.
+
+| Report | Format | Description |
+|--------|--------|-------------|
+| `security_report.md` | Markdown | Numbered findings with code snippets, line numbers, and live URLs |
+| `sinks.md` | Markdown | Prioritised fuzzing target list — dangerous sinks sorted by severity score |
+| `http_headers_report.md` | Markdown | Missing/weak HTTP security headers (HSTS, CSP, X-Frame-Options, cookie flags…) per URL |
+| `forms_inventory.md` | Markdown | All HTML forms deduplicated by signature — direct attack surface for SQLi, XSS, CSRF |
+| `function_usage_report.md` | Markdown | Real function call counts (minified single-char names and JS keywords filtered out) |
+| `final_report.md` | Markdown | Executive summary: site tree, sinks, issue counts, dynamic recommendations, report index |
+| `discovered_files_dirs.json` | JSON | All visited URLs and downloaded files |
+| `discovered_endpoints.json` | JSON | Detected API/Swagger endpoints |
+| `discovered_versions.json` | JSON | Server headers + JS library versions |
+| `discovered_sensitive_data.json` | JSON | Crypto addresses, validated phone numbers, IPs, internal link map |
+
+### Output structure
+
+```
+targets/
+└── example.com_2026-06-07_15-30-00/
+    ├── downloads/
+    │   └── (beautified source files)
+    └── reports/
+        ├── security_report.md
+        ├── sinks.md
+        ├── http_headers_report.md
+        ├── forms_inventory.md
+        ├── function_usage_report.md
+        ├── final_report.md
+        ├── discovered_files_dirs.json
+        ├── discovered_endpoints.json
+        ├── discovered_versions.json
+        └── discovered_sensitive_data.json
+```
 
 ## Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/108806/webscann3r.git
-   cd webscann3r
-   ```
-
-2. Install requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Make the script executable:
-   ```bash
-   chmod +x webscann3r.py
-   ```
+```bash
+git clone https://github.com/108806/webscann3r.git
+cd webscann3r
+pip install -r requirements.txt
+```
 
 ## Usage
 
-Basic usage:
 ```bash
-./webscann3r.py https://example.com
+python webscann3r.py https://example.com
 ```
 
 ### Options
 
 ```
-usage: webscann3r.py [-h] [-d DOWNLOADS] [-r REPORTS] [-a] [-m] [-z] [-t]
-                     [-j THREADS] [--timeout TIMEOUT] [-v] [-q]
-                     url
-
-WebScann3r - A Web Scanning and Mapping Tool for Red Teams
-
 positional arguments:
-  url                   Target URL to scan
+  url                         Target URL to scan
 
 options:
-  -h, --help            show this help message and exit
-  -d DOWNLOADS, --downloads DOWNLOADS
-                        Base directory for downloads (default: ./targets)
-  -r REPORTS, --reports REPORTS
-                        Base directory for reports (default: ./targets)
-  -a [DEPTH], --all-domains [DEPTH]
-                        Scan all linked domains with specified depth (default: unlimited depth)
-  -m, --media           Download media files (images, videos, etc.)
-  -z, --archives        Download archive files (zip, tar, etc.)
-  -t, --text            Download text files (txt, md, etc.)
-  -j THREADS, --threads THREADS
-                        Number of concurrent threads (default: 10)
-  --timeout TIMEOUT     Request timeout in seconds (default: 30)
-  -v, --verbose         Enable verbose output
-  -q, --quiet           Suppress all output except errors
+  -h, --help                  Show this help message and exit
+  -d DIR, --downloads DIR     Base directory for downloads (default: ./targets)
+  -r DIR, --reports DIR       Base directory for reports (default: ./targets)
+  -a [DEPTH], --all-domains   Scan all linked domains (optional depth limit)
+  --depth DEPTH               Crawl depth limit (default: 3)
+  -m, --media                 Download media files (images, videos, etc.)
+  -z, --archives              Download archive files (zip, tar, etc.)
+  -t, --text                  Download text files (txt, md, csv, json, xml)
+  -j N, --threads N           Concurrent threads (default: 15)
+  --timeout N                 Request timeout in seconds (default: 20)
+  -v, --verbose               Enable verbose output
+  -q, --quiet                 Suppress all output except errors
 ```
 
 ### Examples
 
-1. Basic scan of a website:
-   ```bash
-   ./webscann3r.py https://example.com
-   ```
+```bash
+# Basic scan
+python webscann3r.py https://example.com
 
-2. Scan with more threads for faster operation:
-   ```bash
-   ./webscann3r.py https://example.com -j 20
-   ```
+# Faster scan with more threads
+python webscann3r.py https://example.com -j 30
 
-3. Scan and download media files as well:
-   ```bash
-   ./webscann3r.py https://example.com -m
-   ```
+# Shallow crawl (depth 1) — fast recon
+python webscann3r.py https://example.com --depth 1
 
-4. Scan all linked domains (not just the target):
-   ```bash
-   ./webscann3r.py https://example.com -a
-   ```
+# Full scan including media and archives
+python webscann3r.py https://example.com -m -z -t
 
-5. Scan all linked domains with depth limit of 1 (only direct links):
-   ```bash
-   ./webscann3r.py https://example.com -a 1
-   ```
+# Follow external links (use with care)
+python webscann3r.py https://example.com -a
 
-6. Complete scan with all file types:
-   ```bash
-   ./webscann3r.py https://example.com -a -m -z -t
-   ```
-
-7. Verbose output for debugging:
-   ```bash
-   ./webscann3r.py https://example.com -v
-   ```
-
-## Reports
-
-After scanning, WebScann3r generates several reports in the target-specific reports directory:
-
-1. **security_report.md**: Details all potential security issues found in the code
-2. **function_usage_report.md**: Shows how many times each function is called
-3. **final_report.md**: A comprehensive summary of the scan results
-4. **discovered_files_dirs.json**: A structured JSON file containing all discovered files and directories
-5. **discovered_endpoints.json**: A JSON file listing all detected API endpoints and routes
-6. **discovered_versions.json**: A JSON file containing all detected software versions and technology stack information
-
-The reports are organized by target site with timestamps in a structure like:
-```
-targets/
-└── example.com_20250515_120000/
-    ├── downloads/
-    │   └── (downloaded files)
-    └── reports/
-        ├── final_report.md
-        ├── security_report.md
-        ├── function_usage_report.md
-        ├── discovered_files_dirs.json
-        ├── discovered_endpoints.json
-        └── discovered_versions.json
+# Follow external links, max depth 2
+python webscann3r.py https://example.com -a 2
 ```
 
-This structure ensures each scan is isolated and timestamped for better organization.
+## Understanding the Reports
 
-## Expected Behavior and Reporting Logic
+### Start here: `security_report.md`
 
-WebScann3r is designed to help both red teamers and defenders by distinguishing between *potential* attack surfaces (sinks) and *actual* vulnerabilities. This section clarifies what you should expect in the reports:
+Each finding shows the file, the **live URL**, the issue type, line number, the regex that triggered, and the code snippet with the match highlighted. Address findings here first — these are patterns known to indicate real vulnerabilities.
 
-### Sinks vs. Vulnerabilities
+### Fuzzing targets: `sinks.md`
 
-- **Sinks** (in `sinks.md`):
-  - These are code locations where dangerous functions (like `exec`, `eval`, `system`, etc.) are called, regardless of what input is used.
-  - Sinks are *not* always vulnerabilities. They are places a red teamer should consider for fuzzing or further review.
-  - Example: `exec($foo)` will be listed as a sink, even if `$foo` is not user-controlled.
+Lists every call to a dangerous function (eval, exec, innerHTML, SQL query APIs, file ops, JWT signing, etc.) sorted by a risk score. Not every sink is a vulnerability — a sink is where user input *could* cause damage. Use this list to guide manual review and dynamic testing.
 
-- **Vulnerabilities** (in `security_report.md`):
-  - Only code patterns that match known dangerous usage (e.g., user input passed to `exec`, like `exec($_GET['cmd'])`) are reported as vulnerabilities.
-  - These are the issues that are most likely to be exploitable without further manual investigation.
+### Attack surface: `forms_inventory.md`
 
-### Why is this distinction important?
-- Not every use of a dangerous function is a vulnerability. Many are safe, or only dangerous if user input is involved.
-- Reporting every sink as a vulnerability would create too much noise and lead to false positives.
-- This approach helps you focus on real issues, while still giving you the option to review all potentially risky code.
+Every unique HTML form the crawler found, deduplicated by (action, method, parameter names). This is your starting point for SQLi, XSS, and CSRF testing — the complete list of endpoints that accept user input.
 
-### Typical Report Example
-- You may see many `exec` or `eval` calls in `sinks.md`, but only a few (or none) in `security_report.md`.
-- This is expected and correct. If you believe a real vulnerability is missed, check the relevant code and consider improving the regex patterns or reporting logic.
+### Header hardening: `http_headers_report.md`
 
-### How to Use the Reports
-- **Start with `security_report.md`** to find likely vulnerabilities.
-- **Use `sinks.md`** to guide manual code review, fuzzing, or further dynamic testing.
-- **Review the function usage and endpoint reports** for additional context.
+Checks every crawled URL for missing or misconfigured security headers:
+- `Strict-Transport-Security` — HSTS
+- `Content-Security-Policy` — XSS mitigation
+- `X-Frame-Options` / `frame-ancestors` — clickjacking
+- `X-Content-Type-Options` — MIME sniffing
+- `Referrer-Policy` — data leakage
+- `Set-Cookie` — `Secure`, `HttpOnly`, `SameSite` flags
+- `Server` / `X-Powered-By` — tech stack disclosure
 
-If you are unsure whether a finding is a vulnerability or just a sink, consult this section before opening a bug report.
+### Summary: `final_report.md`
 
-## Recommendations for Use
+Site structure tree, sink sample, issue type breakdown, and recommendations derived from what was actually found (not generic advice). Includes a report index with links to all other files.
 
-- Start with a basic scan to understand the website structure
-- Use the `-a` flag cautiously as it may scan external domains
-- Review the security report to identify potential vulnerabilities 
-- Examine the function usage report to understand the application flow
-- Check downloaded code files for additional security issues or attack vectors
+## Sinks vs. Vulnerabilities
+
+**Sinks** (`sinks.md`) are places where dangerous functions are called. They are fuzzing candidates, not confirmed vulnerabilities — the function might receive only trusted input.
+
+**Vulnerabilities** (`security_report.md`) match patterns that indicate likely exploitability: user-controlled data flowing into a dangerous operation, weak cryptographic choices, hardcoded credentials, etc.
+
+Start with `security_report.md` for confirmed signals. Use `sinks.md` to guide manual review and dynamic fuzzing.
 
 ## Disclaimer
 
-This tool is created for legitimate security testing purposes. Only use it on websites that you own or have explicit permission to test. Unauthorized scanning may be illegal in your jurisdiction.
+Use only on systems you own or have explicit written permission to test. Unauthorised scanning may be illegal in your jurisdiction.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License — see the LICENSE file for details.
