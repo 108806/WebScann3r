@@ -2,6 +2,7 @@
 
 import os
 import re
+import threading
 import requests
 from urllib.parse import urlparse, urljoin
 import logging
@@ -74,12 +75,12 @@ class WebScanner:
             download_text (bool): Whether to download text files
             threads (int): Number of threads for concurrent requests
             timeout (int): Request timeout in seconds
-            max_depth (int): Maximum depth to crawl (default 1)
+            max_depth (int): Maximum depth to crawl (default 3)
         """
         self.target_url = target_url
         self.base_domain = urlparse(target_url).netloc
         self.same_domain_only = same_domain_only
-        self.max_depth = 1 if max_depth is None else max_depth
+        self.max_depth = 3 if max_depth is None else max_depth
         self.download_media = download_media
         self.download_archives = download_archives
         self.download_text = download_text
@@ -147,6 +148,9 @@ class WebScanner:
         # Dictionary to store potential sinks
         self.potential_sinks = []
         
+        # Fix #5: lock for thread-safe URL deduplication
+        self._visited_lock = threading.Lock()
+
         # Counters for download success/failure
         self.successful_downloads = 0
         self.failed_downloads = 0
@@ -182,7 +186,7 @@ class WebScanner:
                 return False
                 
             # Reject URLs with suspicious content that looks like JavaScript
-            js_indicators = ['function(', 'return', '.fn.', '$.', 'arguments.length', '/g,', '/i,']
+            js_indicators = ['function(', '.fn.', '$.', 'arguments.length', '/g,', '/i,']
             if any(indicator in path for indicator in js_indicators):
                 return False
                 
@@ -230,7 +234,6 @@ class WebScanner:
                     url, current_depth = future_to_url[future]
                     try:
                         new_urls = future.result()
-                        self.successful_downloads += 1
                         # Add new discovered URLs to the queue if they haven't been visited
                         next_depth = current_depth + 1
                         
@@ -275,10 +278,11 @@ class WebScanner:
         Returns:
             list: List of new discovered URLs
         """
-        if url in self.visited_urls:
-            return []
-        
-        self.visited_urls.add(url)
+        # Fix #5: atomic check-and-add prevents two threads processing the same URL
+        with self._visited_lock:
+            if url in self.visited_urls:
+                return []
+            self.visited_urls.add(url)
         logger.info(f"Processing: {url} (depth: {depth})")
         
         max_retries = 3
@@ -308,7 +312,7 @@ class WebScanner:
                 file_path = self.get_file_path(url)
                 
                 # Handle based on content type and extension
-                if any(ext in file_path.lower() for ext in self.code_extensions):
+                if any(file_path.lower().endswith(ext) for ext in self.code_extensions):
                     # Handle code files
                     self.save_and_store_code(url, response.text, file_path)
                     # Extract URLs from code files as well
@@ -339,17 +343,17 @@ class WebScanner:
                     self.save_and_store_code(url, response.text, file_path)
                     return []
                 
-                elif any(ext in file_path.lower() for ext in self.media_extensions) and self.download_media:
+                elif any(file_path.lower().endswith(ext) for ext in self.media_extensions) and self.download_media:
                     # Handle media files if allowed
                     self.save_file(url, response.content, file_path, is_binary=True)
                     return []
                 
-                elif any(ext in file_path.lower() for ext in self.archive_extensions) and self.download_archives:
+                elif any(file_path.lower().endswith(ext) for ext in self.archive_extensions) and self.download_archives:
                     # Handle archive files if allowed
                     self.save_file(url, response.content, file_path, is_binary=True)
                     return []
                 
-                elif any(ext in file_path.lower() for ext in self.text_extensions) and self.download_text:
+                elif any(file_path.lower().endswith(ext) for ext in self.text_extensions) and self.download_text:
                     # Handle text files if allowed
                     self.save_and_store_code(url, response.text, file_path)
                     return []
@@ -423,9 +427,13 @@ class WebScanner:
             logger.info(f"Found {len(forms)} forms in {url}")
             
             for form in forms:
-                # Check if form has JavaScript auto-submit (init() function call or f.submit())
-                logger.info(f"Checking form: {form}")
-                has_auto_submit = 'init()' in html_content or 'submit()' in html_content
+                # Fix #8: scope to the form element itself, not the entire page
+                form_str = str(form)
+                has_auto_submit = (
+                    form.get('onsubmit') is not None or
+                    'submit()' in form_str or
+                    'init()' in form_str
+                )
                 logger.info(f"Auto-submit detected: {has_auto_submit}")
                 
                 if has_auto_submit:
@@ -577,7 +585,9 @@ class WebScanner:
                 
                 with open(file_path, mode, encoding=encoding) as f:
                     f.write(content)
-                
+
+                # Fix #7: count actual file saves, not URL visits
+                self.successful_downloads += 1
                 logger.info(f"Saved: {url} to {file_path}")
                 return  # Success, exit the function
             except Exception as e:
@@ -706,17 +716,15 @@ class WebScanner:
                                             discovered_urls.append(absolute_url)
         except Exception as e:
             logger.error(f"Error extracting URLs from {base_url}: {e}")
-        # Also try to find URLs in JavaScript and CSS content using regex
-        js_css_urls = []
-        patterns = html_url_patterns
-        for pattern in patterns:
+        # Fix #3: actually append validated URLs instead of silently dropping them
+        for pattern in html_url_patterns:
             for match in re.finditer(pattern, html_content):
                 url = match.group(1)
                 absolute_url = urljoin(base_url, url)
-                # Validate URL before processing
-                if not url or not self.is_valid_url(urljoin(base_url, url)):
+                if not url or not self.is_valid_url(absolute_url):
                     continue
-        discovered_urls.extend(js_css_urls)
+                if self.should_process_url(absolute_url):
+                    discovered_urls.append(absolute_url)
         # Remove duplicates and return
         return list(set(discovered_urls))
     
@@ -935,29 +943,27 @@ class WebScanner:
         """
         logger.info("Starting code analysis...")
         print(f"Analyzing {len(self.code_files)} files...")
-        analyzed = 0
-        total = len(self.code_files)
-        # Progress bar only
-        for _ in self.code_files.items():
-            analyzed += 1
-            percent = int((analyzed / total) * 100)
-            print(f"\rAnalysis progress: {analyzed}/{total} ({percent}%)", end="")
-        print()  # Newline after progress bar
-
-        # Use SecurityAnalyzer for vulnerability detection
+        # Fix #13: progress is printed inside SecurityAnalyzer.analyze_code
         from .analyzer import SecurityAnalyzer
         analyzer = SecurityAnalyzer()
         security_findings = analyzer.analyze_code(self.code_files)
 
-        # Sink detection: look for dangerous function calls and taint sinks (legacy, for sinks.md)
+        # Sink detection: look for dangerous function calls and taint sinks (for sinks.md)
+        # Deduplicate: only record first occurrence of each (file, sink_text) pair to avoid
+        # flooding the report with the same sink appearing hundreds of times in a minified bundle.
+        _seen_sinks = set()  # (file_path, normalised_sink_text)
         for file_path, content in self.code_files.items():
             # Count function calls in JS files
             extension = os.path.splitext(file_path)[1].lower()
             if extension == '.js':
                 self.count_js_function_calls(content)
-            # Sink detection patterns (keep for sinks.md)
             for sink_pat in sink_patterns:
                 for match in re.finditer(sink_pat, content):
+                    sink_text = match.group(0).strip().rstrip('(').rstrip()
+                    dedup_key = (file_path, sink_text.lower())
+                    if dedup_key in _seen_sinks:
+                        continue
+                    _seen_sinks.add(dedup_key)
                     line_number = content[:match.start()].count('\n') + 1
                     code_line = content.splitlines()[line_number - 1].strip()
                     self.potential_sinks.append({
@@ -986,7 +992,7 @@ class WebScanner:
                 for sink in sorted_sinks:
                     file = os.path.basename(sink['file'])
                     line = sink['line']
-                    sink_type = sink['sink'].split('(')[0].strip().replace('.', '')
+                    sink_type = sink['sink'].split('(')[0].strip().rstrip('= ')
                     regex = sink['sink']
                     score = self.get_sink_score(sink['sink'])
                     f.write(f"| `{file}` | {line} | `{sink_type}` | `{regex}` | **{score}** |\n")
@@ -1157,10 +1163,9 @@ class WebScanner:
         # Create a set of unique directory paths from all downloaded files
         dir_set = set()
         for file_path in self.code_files.keys():
-            # Get the directory portion of the path
             dir_path = os.path.dirname(file_path)
-            # Split by "/" to get all parent directories too
-            parts = dir_path.split("/")
+            # Fix #11a: normalise separator so this works on Windows too
+            parts = dir_path.replace('\\', '/').split('/')
             current = ""
             for part in parts:
                 if part:

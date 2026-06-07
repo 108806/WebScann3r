@@ -1,238 +1,191 @@
 """
 Dangerous sink patterns for WebScann3r
 
-This file contains regex patterns for identifying dangerous function calls and taint sinks
-across multiple languages (JS, PHP, Python, Java, .NET, etc). These are used for sink detection
-in scanner.py and for generating sinks.md reports.
+Patterns here identify where user-controlled data could cause security issues.
+Used to generate sinks.md (fuzzing target list) — NOT the security_report.md findings.
 
-Expand or update this list as new dangerous sinks are discovered.
+Rules to prevent noise floods:
+- exec/eval: require negative lookbehind (?<!\\.) to exclude .exec()/.eval() method calls
+- Function: case-sensitive capital-F only (the JS constructor), not the 'function' keyword
+- render: only specific template engine render calls, not React render()
+- open: require it is not a method call (e.g. xhr.open is excluded)
+- No duplicate entries — each sink appears exactly once
 """
 
 sink_patterns = [
-    # Code execution (JS, PHP, Python, etc)
-    r'(?i)eval\s*\(',
-    r'(?i)exec\s*\(',
+    # ── Code execution ────────────────────────────────────────────────────────
+    r'(?i)(?<!\.)\beval\s*\(',           # eval() but not .eval() (JS method)
+    r'(?i)(?<!\.)\bexec\s*\(',           # exec() but not .exec() (RegExp.exec)
     r'(?i)system\s*\(',
     r'(?i)popen\s*\(',
     r'(?i)passthru\s*\(',
     r'(?i)proc_open\s*\(',
+    r'(?i)shell_exec\s*\(',
+    r'(?i)create_function\s*\(',         # deprecated PHP eval wrapper
     r'(?i)assert\s*\(',
     r'(?i)base64_decode\s*\(',
-    r'(?i)unserialize\s*\(',
+    r'(?i)execfile\s*\(',
+    r'(?i)compile\s*\(',
+    r'(?i)exec_module\b',
+
+    # ── JS Function constructor (capital-F only — avoids 'function' keyword) ─
+    r'Function\s*\(',                    # case-sensitive: Function( not function(
+    r'new\s+Function\b',
+    r'window\.Function\b',
+    r'window\.eval\b',
+
+    # ── JS timers (can execute strings as code) ──────────────────────────────
+    r'(?i)setTimeout\s*\(',
+    r'(?i)setInterval\s*\(',
+
+    # ── DOM sinks (HTML injection, XSS) ──────────────────────────────────────
     r'(?i)document\.write\s*\(',
     r'(?i)document\.writeln\s*\(',
     r'(?i)innerHTML\s*=\s*',
     r'(?i)outerHTML\s*=\s*',
+    r'(?i)insertAdjacentHTML\s*\(',
     r'(?i)dangerouslySetInnerHTML',
     r'(?i)document\.execCommand\s*\(',
-    r'(?i)Function\s*\(',
-    r'(?i)new Function',
-    r'(?i)window\.Function',
-    r'(?i)window\.eval',
-    r'(?i)setTimeout\s*\(',
-    r'(?i)setInterval\s*\(',
-    r'(?i)child_process\.exec\s*\(',
-    r'(?i)os\.system\s*\(',
-    r'(?i)os\.exec',
-    r'(?i)os\.execl',
-    r'(?i)os\.execle',
-    r'(?i)os\.execlp',
-    r'(?i)os\.execlpe',
-    r'(?i)os\.execv',
-    r'(?i)os\.execve',
-    r'(?i)os\.execvp',
-    r'(?i)os\.execvpe',
-    r'(?i)os\.popen',
-    r'(?i)os\.spawn',
-    r'(?i)os\.fork',
-    r'(?i)os\.forkpty',
-    r'(?i)os\.kill',
-    r'(?i)os\.killpg',
-    r'(?i)os\.startfile',
-    r'(?i)subprocess\.(?:call|Popen|run|check_call|check_output)\s*\(',
-    r'(?i)input\s*\(',
-    r'(?i)pickle\.loads?\s*\(',
-    r'(?i)pickle\.load\s*\(',
-    r'(?i)yaml\.load\s*\(',
-    r'(?i)marshal\.loads\s*\(',
-    r'(?i)unmarshal\s*\(',
-    r'(?i)ObjectInputStream\.readObject',
-    r'(?i)open\s*\(',
-    r'(?i)require\s*\(',
-    r'(?i)include\s*\(',
+    r'(?i)\.srcdoc\s*=',
+    r'(?i)\.setAttribute\s*\(\s*["\'](?:src|href|action|onclick|on\w+)["\']',
+
+    # ── Redirect sinks (open redirect) ────────────────────────────────────────
+    r'(?i)document\.location\b',
+    r'(?i)window\.location\b',
+    r'(?i)location\.href\s*=',
+    r'(?i)location\.replace\s*\(',
+    r'(?i)location\.assign\s*\(',
+    r'(?i)window\.navigate\s*\(',
+
+    # ── Browser storage ───────────────────────────────────────────────────────
+    r'(?i)localStorage\.setItem\s*\(',
+    r'(?i)sessionStorage\.setItem\s*\(',
+    r'(?i)document\.cookie\s*=',
+    r'(?i)window\.postMessage\s*\(',
+    r'(?i)window\.open\s*\(',
+
+    # ── File operations (server-side) ─────────────────────────────────────────
+    r'(?i)(?<!\.)\bopen\s*\(',           # Python/Ruby open() — exclude .open() method calls
+    r'(?i)fopen\s*\(',
+    r'(?i)file_get_contents\s*\(',
+    r'(?i)file_put_contents\s*\(',
+    r'(?i)readfile\s*\(',
+    r'(?i)move_uploaded_file\s*\(',
+    r'(?i)fs\.(readFile|writeFile|appendFile|createWriteStream|createReadStream|unlink|rmdir|chmod|chown|mkdir|readdir)\s*\(',
+
+    # ── File upload sinks (Node.js / Python / PHP) ───────────────────────────
+    r'(?i)multer\s*\(',
+    r'(?i)formidable\s*\(',
+    r'(?i)busboy\s*\(',
+    r'(?i)multiparty\s*\(',
+    r'(?i)request\.files\b',
+    r'(?i)\$_FILES\b',
+    r'(?i)\.save\s*\(\s*["\']?(?:upload|file)',   # ORM/framework save to upload path
+
+    # ── HTTP request sinks (SSRF) ─────────────────────────────────────────────
     r'(?i)fetch\s*\(',
-    r'(?i)axios\.(?:get|post|put|delete|patch)\s*\(',
+    r'(?i)axios\.(?:get|post|put|delete|patch|request)\s*\(',
     r'(?i)\.ajax\s*\(',
-    r'(?i)XMLHttpRequest',
-    r'(?i)http\.request',
-    r'(?i)https\.request',
-    r'(?i)requests\.(get|post)',
-    r'(?i)urllib\.request',
-    r'(?i)curl_exec',
-    r'(?i)curl_setopt',
-    r'(?i)curl_init',
-    r'(?i)socket',
-    r'(?i)netcat',
-    r'(?i)render_template',
-    r'(?i)render',
-    r'(?i)twig\.render',
-    r'(?i)ejs\.render',
-    r'(?i)mustache\.render',
-    r'(?i)mysql_query',
-    r'(?i)mysqli_query',
-    r'(?i)pdo_query',
-    r'(?i)pg_query',
-    r'(?i)sqlite_query',
-    r'(?i)db\.query',
-    r'(?i)fs\.(readFile|writeFile|appendFile|createWriteStream|createReadStream|unlink|rmdir)',
-    r'(?i)file_get_contents',
-    r'(?i)file_put_contents',
-    r'(?i)readfile',
-    r'(?i)fopen',
-    r'(?i)shell_exec',
-    r'(?i)create_function',
-    r'(?i)preg_replace',
-    r'(?i)move_uploaded_file',
-    r'(?i)parse_str',
-    r'(?i)Runtime.getRuntime\(\)\.exec',
-    r'(?i)ProcessBuilder',
-    r'(?i)Process.Start',
-    r'(?i)Assembly.Load',
-    r'(?i)AppDomain.CreateDomain',
-    r'(?i)Type.GetType',
-    r'(?i)dangerous_function',
-    r'(?i)dangerous_eval',
-    r'(?i)dangerous_exec',
-    r'(?i)compile\s*\(',
-    r'(?i)execfile\s*\(',
-    r'(?i)exec_module',
-    r'(?i)importlib.import_module',
-    # DOM/Browser sinks
-    r'(?i)document.location',
-    r'(?i)window.location',
-    r'(?i)location.href',
-    r'(?i)location.replace',
-    r'(?i)location.assign',
-    r'(?i)window.open',
-    r'(?i)window.postMessage',
-    r'(?i)document.cookie',
-    r'(?i)localStorage.setItem',
-    r'(?i)sessionStorage.setItem',
-    # Additional/expanded sinks
-    r'(?i)document.URL',
-    r'(?i)document.referrer',
-    r'(?i)window.name',
-    r'(?i)window.parent',
-    r'(?i)window.frames',
-    r'(?i)window.top',
-    r'(?i)window.self',
-    r'(?i)window.content',
-    r'(?i)window.defaultStatus',
-    r'(?i)window.status',
-    r'(?i)window.scrollTo',
-    r'(?i)window.scrollBy',
-    r'(?i)window.moveTo',
-    r'(?i)window.resizeTo',
-    r'(?i)window.focus',
-    r'(?i)window.blur',
-    r'(?i)window.close',
-    r'(?i)window.print',
-    r'(?i)window.stop',
-    r'(?i)window.alert',
-    r'(?i)window.confirm',
-    r'(?i)window.prompt',
-    r'(?i)window.showModalDialog',
-    r'(?i)window.showModelessDialog',
-    r'(?i)window.setImmediate',
-    r'(?i)window.clearImmediate',
-    r'(?i)window.setInterval',
-    r'(?i)window.clearInterval',
-    r'(?i)window.setTimeout',
-    r'(?i)window.clearTimeout',
-    r'(?i)window.requestAnimationFrame',
-    r'(?i)window.cancelAnimationFrame',
-    r'(?i)window.requestIdleCallback',
-    r'(?i)window.cancelIdleCallback',
-    r'(?i)window.postMessage',
-    r'(?i)window.dispatchEvent',
-    r'(?i)window.addEventListener',
-    r'(?i)window.removeEventListener',
-    r'(?i)window.onmessage',
-    r'(?i)window.onerror',
-    r'(?i)window.onunhandledrejection',
-    r'(?i)window.onbeforeunload',
-    r'(?i)window.onunload',
-    r'(?i)window.onhashchange',
-    r'(?i)window.onpopstate',
-    r'(?i)window.onstorage',
-    r'(?i)window.onresize',
-    r'(?i)window.onscroll',
-    r'(?i)window.onfocus',
-    r'(?i)window.onblur',
-    r'(?i)window.ononline',
-    r'(?i)window.onoffline',
-    r'(?i)window.onpagehide',
-    r'(?i)window.onpageshow',
-    r'(?i)window.onbeforeprint',
-    r'(?i)window.onafterprint',
-    # Node.js/Server-side JS
-    r'(?i)child_process\.spawn',
-    r'(?i)child_process\.fork',
-    r'(?i)child_process\.execFile',
-    r'(?i)child_process\.execSync',
-    r'(?i)child_process\.spawnSync',
-    r'(?i)child_process\.fork',
-    r'(?i)fs\.(chmod|chown|unlink|rmdir|mkdir|readdir|readFile|writeFile|appendFile|createReadStream|createWriteStream)',
-    r'(?i)process\.env',
-    r'(?i)process\.exit',
-    r'(?i)process\.kill',
-    r'(?i)process\.abort',
-    r'(?i)process\.chdir',
-    r'(?i)process\.cwd',
-    r'(?i)process\.umask',
-    r'(?i)process\.setuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    r'(?i)process\.setgid',
-    r'(?i)process\.setgroups',
-    r'(?i)process\.setegid',
-    r'(?i)process\.seteuid',
-    # Misc
-    r'(?i)dangerous_eval',
-    r'(?i)dangerous_exec',
-    r'(?i)dangerous_function',
+    r'(?i)XMLHttpRequest\b',
+    r'(?i)http\.(?:get|request)\s*\(',
+    r'(?i)https\.(?:get|request)\s*\(',
+    r'(?i)requests\.(?:get|post|put|delete|patch)\s*\(',
+    r'(?i)urllib\.request\b',
+    r'(?i)curl_exec\s*\(',
+    r'(?i)curl_setopt\s*\(',
+    r'(?i)curl_init\s*\(',
+
+    # ── Network / socket sinks ────────────────────────────────────────────────
+    r'(?i)new\s+WebSocket\s*\(',
+    r'(?i)io\.connect\s*\(',             # Socket.IO client
+    r'(?i)net\.connect\s*\(',            # Node.js net module
+    r'(?i)net\.createConnection\s*\(',
+    r'(?i)\bsocket\s*\.\s*(?:connect|send|write)\s*\(',
+
+    # ── SQL sinks ─────────────────────────────────────────────────────────────
+    r'(?i)mysql_query\s*\(',
+    r'(?i)mysqli_query\s*\(',
+    r'(?i)pg_query\s*\(',
+    r'(?i)sqlite_query\s*\(',
+    r'(?i)db\.query\s*\(',
+    r'(?i)cursor\.execute\s*\(',
+    r'(?i)\.executeQuery\s*\(',
+    r'(?i)\.executeUpdate\s*\(',
+    r'(?i)sequelize\.query\s*\(',
+    r'(?i)knex\.raw\s*\(',
+    r'(?i)Model\.objects\.raw\s*\(',     # Django ORM raw
+    r'(?i)xp_cmdshell\b',
+    r'(?i)sp_executesql\b',
+
+    # ── NoSQL sinks ───────────────────────────────────────────────────────────
+    r'(?i)\$where\s*:',
+    r'(?i)mapReduce\s*\(',
+    r'(?i)collection\.find\s*\(',
+    r'(?i)mongoose\.\w+\.find\s*\(',
+
+    # ── Template rendering sinks (SSTI) ────────────────────────────────────────
+    r'(?i)render_template\s*\(',         # Flask
+    r'(?i)twig\.render\s*\(',
+    r'(?i)ejs\.render\s*\(',
+    r'(?i)mustache\.render\s*\(',
+    r'(?i)Handlebars\.compile\s*\(',
+    r'(?i)pug\.render\s*\(',
+    r'(?i)jade\.render\s*\(',
+    r'(?i)nunjucks\.render\s*\(',
+    r'(?i)env\.from_string\s*\(',        # Jinja2 from_string (dangerous)
+    r'(?i)Template\s*\(\s*[^)]*\+',     # Template with string concat
+    r'(?i)vm\.runInNewContext\s*\(',     # Node.js vm module
+
+    # ── Deserialization sinks ─────────────────────────────────────────────────
+    r'(?i)unserialize\s*\(',
+    r'(?i)pickle\.loads?\s*\(',
+    r'(?i)yaml\.load\s*\(',             # safe is yaml.safe_load
+    r'(?i)marshal\.loads?\s*\(',
+    r'(?i)unmarshal\s*\(',
+    r'(?i)ObjectInputStream\.readObject\b',
+    r'(?i)JSON\.parse\s*\(',            # safe but worth noting for prototype pollution
+
+    # ── Dynamic import / code loading ─────────────────────────────────────────
+    r'(?i)importlib\.import_module\s*\(',
+    r'(?i)require\s*\(',               # CommonJS dynamic require
+    r'(?i)__import__\s*\(',
+    r'(?i)import\s*\(\s*[^"\')\n]',   # Dynamic import() with variable
+
+    # ── Process / OS (server-side command execution) ──────────────────────────
+    r'(?i)os\.system\s*\(',
+    r'(?i)os\.popen\s*\(',
+    r'(?i)os\.exec[lv][ep]?\s*\(',
+    r'(?i)os\.startfile\s*\(',
+    r'(?i)subprocess\.(?:Popen|call|run|check_call|check_output|getoutput)\s*\(',
+    r'(?i)child_process\.(?:exec|execSync|spawn|spawnSync|fork|execFile)\s*\(',
+    r'(?i)process\.binding\s*\(',       # Node.js internal binding (dangerous)
+
+    # ── Java execution sinks ──────────────────────────────────────────────────
+    r'(?i)Runtime\.getRuntime\s*\(\s*\)\.exec\s*\(',
+    r'(?i)ProcessBuilder\s*\(',
+    r'(?i)Process\.Start\s*\(',
+    r'(?i)Assembly\.Load\s*\(',
+    r'(?i)AppDomain\.CreateDomain\s*\(',
+    r'(?i)Type\.GetType\s*\(',
+    r'(?i)ScriptEngineManager\s*\(',
+
+    # ── LDAP sinks ────────────────────────────────────────────────────────────
+    r'(?i)ldap_search\s*\(',
+    r'(?i)ldap_bind\s*\(',
+    r'(?i)ldap\.search\s*\(',
+    r'(?i)DirContext\.search\s*\(',
+
+    # ── Path traversal sinks ──────────────────────────────────────────────────
+    r'(?i)parse_str\s*\(',
+    r'(?i)preg_replace\s*\(',
+    r'(?i)php://\w',
+    r'(?i)file:///',
+
+    # ── JWT / crypto misuse ───────────────────────────────────────────────────
+    r'(?i)jwt\.sign\s*\(',
+    r'(?i)jwt\.verify\s*\(',
+    r'(?i)jsonwebtoken\.sign\s*\(',
+    r'(?i)crypto\.createCipher\s*\(',   # deprecated — no auth
+    r'(?i)crypto\.createDecipher\s*\(',
+    r'(?i)Math\.random\s*\(',           # PRNG for security context
 ]
