@@ -120,10 +120,9 @@ class Reporter:
         # Create a set of unique directory paths from all downloaded files
         dir_set = set()
         for file_path in downloaded_files:
-            # Get the directory portion of the path
             dir_path = os.path.dirname(file_path)
-            # Split by "/" to get all parent directories too
-            parts = dir_path.split("/")
+            # Fix #11b: normalise separator so this works on Windows too
+            parts = dir_path.replace('\\', '/').split('/')
             current = ""
             for part in parts:
                 if part:
@@ -147,7 +146,6 @@ class Reporter:
         Each issue is numbered, separated by ASCII art, and shows the regex pattern above the code snippet.
         Uses Berlin time for the report timestamp.
         """
-        print("[DEBUG] generate_security_report called!")  # Debug print
         logger.info("Generating security report...")
         import re
         berlin = pytz.timezone('Europe/Berlin')
@@ -170,23 +168,50 @@ class Reporter:
                 snippet = snippet + '...'
             return snippet.replace('`', '\u0060')
 
+        # Deduplicate findings: same match text for same (file, type) = one entry
+        # Prevents minified vendor JS bundles from flooding the report with
+        # dozens of identical matches (e.g. 14x dangerouslySetInnerHTML in Swagger UI)
+        def _dedup_findings(findings):
+            deduped = {}
+            for file_path, file_issues in findings.items():
+                if file_path == '__summary__' or not isinstance(file_issues, dict):
+                    deduped[file_path] = file_issues
+                    continue
+                deduped[file_path] = {}
+                for issue_type, matches in file_issues.items():
+                    if not isinstance(matches, list):
+                        deduped[file_path][issue_type] = matches
+                        continue
+                    seen = set()
+                    unique = []
+                    for m in matches:
+                        key = m.get('match', '')
+                        if key not in seen:
+                            seen.add(key)
+                            unique.append(m)
+                    deduped[file_path][issue_type] = unique
+            return deduped
+
+        security_findings = _dedup_findings(security_findings)
+
+        # Fix #1: compute before open so issue_count is always defined
+        issue_count = sum(
+            len(issues)
+            for file_path, file_issues in security_findings.items()
+            if file_path != '__summary__' and isinstance(file_issues, dict)
+            for issues in file_issues.values()
+            if isinstance(issues, list)
+        )
+
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write("# WebScann3r Security Report\n\n")
             f.write(f"**Target:** {self.target_url}\n")
             f.write(f"**Date:** {now_berlin}\n\n")
 
-            if not security_findings:
+            if issue_count == 0:
                 f.write("No security issues found.\n")
             else:
                 f.write("## Security Issues Found\n\n")
-                # Only count issues that are lists, skip summary/stat keys
-                issue_count = sum(
-                    len(issues)
-                    for file_issues in security_findings.values()
-                    if isinstance(file_issues, dict)
-                    for issues in file_issues.values()
-                    if isinstance(issues, list)
-                )
                 f.write(f"Total issues found: {issue_count}\n\n")
                 issue_num = 1
                 for file_path, file_findings in security_findings.items():
@@ -347,14 +372,25 @@ class Reporter:
             
             # Security findings summary
             if security_findings:
-                issue_count = sum(len(issues) for file_issues in security_findings.values() for issues in file_issues.values())
+                # Fix #4: guard against __summary__ key and non-list values
+                issue_count = sum(
+                    len(issues)
+                    for file_path, file_issues in security_findings.items()
+                    if file_path != '__summary__' and isinstance(file_issues, dict)
+                    for issues in file_issues.values()
+                    if isinstance(issues, list)
+                )
                 f.write("## Security Issues Summary\n\n")
                 f.write(f"Total issues found: {issue_count}\n\n")
-                
+
                 # Count by issue type
                 issue_types = {}
-                for file_findings in security_findings.values():
+                for file_path, file_findings in security_findings.items():
+                    if file_path == '__summary__' or not isinstance(file_findings, dict):
+                        continue
                     for issue_type, matches in file_findings.items():
+                        if not isinstance(matches, list):
+                            continue
                         if issue_type in issue_types:
                             issue_types[issue_type] += len(matches)
                         else:

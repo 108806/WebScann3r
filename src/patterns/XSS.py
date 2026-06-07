@@ -21,7 +21,8 @@ xss_patterns = [
     # Exclude: void(0), __doPostBack, space after colon (JS object property key like {javascript: true}),
     # and quote immediately after colon (empty URL: e.src="javascript:")
     r'(?i)javascript\s*:(?!(?:\s*(?:void[\s(]|__doPostBack)|["\'\s]))',
-    r'(?i)data:text/html',
+    # bare data:text/html removed — too broad, matches any JS bundle that handles data URIs
+    # covered by the more specific src="data:text/html" pattern below
     r'(?i)vbscript\s*:',
 
     # CSS expression — IE legacy XSS
