@@ -1478,7 +1478,24 @@ class WebScanner:
         files_dirs_json = self.generate_files_directories_json()
         endpoints_json = self.generate_endpoints_json()
         versions_json = self.generate_versions_json()
-        
+
+        # ── API probing phase ──────────────────────────────────────────────────
+        from .api_prober import ApiProber
+        self._api_prober = ApiProber(
+            self.target_url, self.api_endpoints, self.session,
+            timeout=self.timeout, threads=self.threads,
+        )
+        self._api_prober.enrich_from_js(self.code_files)
+        self._api_prober.run()
+        self._api_prober.generate_report(self.report_dir)
+        # Merge API-discovered versions back into the scanner's version map
+        for url, vdata in self._api_prober.version_findings.items():
+            path = urlparse(url).path
+            for k, v in vdata.get('body_versions', {}).items():
+                self.detected_versions[f"API {path}: {k}"] = v
+            for k, v in vdata.get('header_versions', {}).items():
+                self.detected_versions[f"API {path} header {k}"] = v
+
         report_path = os.path.join(self.report_dir, 'final_report.md')
         
         with open(report_path, 'w', encoding='utf-8') as f:
@@ -1639,6 +1656,20 @@ class WebScanner:
                 recs.append("**Input Validation:** Forms detected — validate and sanitise all inputs server-side; see [forms_inventory.md](forms_inventory.md).")
             if self.potential_sinks:
                 recs.append("**Sink Review:** Dangerous sinks detected — review [sinks.md](sinks.md) and test each with user-controlled input.")
+            prober = getattr(self, '_api_prober', None)
+            if prober:
+                if prober.swagger_specs:
+                    recs.append(f"**API Spec Exposure:** {len(prober.swagger_specs)} Swagger/OpenAPI spec(s) publicly accessible — verify if intentional and redact internal paths.")
+                if prober.auth_findings:
+                    recs.append(f"**Unauthenticated API Endpoints:** {len(prober.auth_findings)} endpoint(s) return HTTP 200 without credentials — verify access control. See [api_report.md](api_report.md).")
+                if any(x['severity'] == 'High' for x in prober.cors_findings):
+                    recs.append(f"**CORS Misconfiguration (High):** Origin reflected with credentials=true — cross-site authenticated reads possible. See [api_report.md](api_report.md).")
+                elif prober.cors_findings:
+                    recs.append(f"**CORS:** {len(prober.cors_findings)} CORS issue(s) found. See [api_report.md](api_report.md).")
+                if prober.version_findings:
+                    recs.append(f"**API Version Disclosure:** {len(prober.version_findings)} endpoint(s) expose version/build info — remove or restrict diagnostic endpoints in production.")
+                if prober.method_findings:
+                    recs.append(f"**Dangerous HTTP Methods:** {len(prober.method_findings)} endpoint(s) accept PUT/DELETE/TRACE — restrict to methods actually required.")
             if not recs:
                 recs.append("No specific issues detected. Perform manual review to confirm.")
 
@@ -1659,6 +1690,8 @@ class WebScanner:
                 f.write("| [http_headers_report.md](http_headers_report.md) | Missing/weak HTTP security headers |\n")
             if self.forms_found:
                 f.write("| [forms_inventory.md](forms_inventory.md) | All forms and input parameters |\n")
+            f.write("| [api_report.md](api_report.md) | API probe — spec exposure, CORS, auth, methods, version disclosure |\n")
+            f.write("| [api_details.json](api_details.json) | Raw per-endpoint API probe data |\n")
             f.write("\n")
         
         logger.info(f"Final report generated: {report_path}")

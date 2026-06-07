@@ -32,7 +32,7 @@ A web reconnaissance and static analysis tool for red team assessments. Crawls a
 - **Finding deduplication** — identical matches in minified bundles are reported once, not hundreds of times
 
 ### Reporting
-- **10 reports per scan** — see full list below
+- **12 reports per scan** — see full list below
 - **URL annotations** — every security finding shows the live URL alongside the local file name
 - **Dynamic recommendations** — final report recommendations are derived from actual finding types, not boilerplate
 - **Severity-sorted header audit** — HTTP security headers checked across every crawled URL
@@ -53,6 +53,8 @@ Each scan produces a timestamped directory under `targets/`. All reports are ins
 | `discovered_endpoints.json` | JSON | Detected API/Swagger endpoints |
 | `discovered_versions.json` | JSON | Server headers + JS library versions |
 | `discovered_sensitive_data.json` | JSON | Crypto addresses, validated phone numbers, IPs, internal link map |
+| `api_report.md` | Markdown | API probe results — Swagger/OpenAPI exposure, unauthenticated endpoints, CORS misconfigs, version disclosure, dangerous HTTP methods |
+| `api_details.json` | JSON | Raw per-endpoint API probe data (headers, CORS, method support, version fields) |
 
 ### Output structure
 
