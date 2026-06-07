@@ -155,6 +155,13 @@ class WebScanner:
         self.successful_downloads = 0
         self.failed_downloads = 0
         self.failed_files = []
+
+        # Maps relative file path → original URL (used by security_report URL annotations)
+        self.file_url_map = {}
+        # All forms found during crawl for forms_inventory.md
+        self.forms_found = []
+        # HTTP security header issues per URL for http_headers_report.md
+        self.security_headers_issues = {}
         
     def is_valid_url(self, url):
         """
@@ -299,7 +306,9 @@ class WebScanner:
 
                 # Extract version information from headers
                 self.extract_versions_from_headers(response.headers)
-                
+                # Record missing/weak security headers
+                self.check_security_headers(url, response.headers)
+
                 if response.status_code != 200:
                     logger.warning(f"Received status code {response.status_code} for {url}")
                     return []
@@ -331,11 +340,14 @@ class WebScanner:
                     
                     # Special case: IntraWeb applications detection in HTML
                     if 'IntraWeb' in response.text or 'IW_' in response.text or '/$/' in response.text:
-                        intraweb_main = urljoin(url, '/$/') 
+                        intraweb_main = urljoin(url, '/$/')
                         if self.should_process_url(intraweb_main):
                             discovered_urls.append(intraweb_main)
                             logger.info(f"Detected IntraWeb application in HTML, adding main app URL: {intraweb_main}")
-                    
+
+                    # Collect all forms for forms_inventory.md
+                    self.extract_forms(url, response.text)
+
                     return discovered_urls
                 
                 elif any(file in url.lower() for file in self.special_files):
@@ -637,6 +649,7 @@ class WebScanner:
         
         # Store the code for analysis
         rel_path = os.path.relpath(file_path, self.download_dir)
+        self.file_url_map[rel_path] = url  # remember which URL produced this file
         # Try to read the beautified file
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -914,29 +927,93 @@ class WebScanner:
         
         return True
     
+    # JS/Python keywords and builtins that are not real function names
+    _CALL_NOISE = frozenset([
+        'if', 'for', 'while', 'switch', 'catch', 'function', 'return', 'var',
+        'let', 'const', 'new', 'this', 'typeof', 'instanceof', 'in', 'of',
+        'delete', 'void', 'throw', 'try', 'else', 'do', 'break', 'continue',
+        'class', 'extends', 'import', 'export', 'default', 'static', 'super',
+        'yield', 'async', 'await', 'true', 'false', 'null', 'undefined',
+        'NaN', 'Infinity', 'debugger', 'with', 'case',
+    ])
+
     def count_js_function_calls(self, js_content):
-        """
-        Count function calls in JavaScript content
-        
-        Args:
-            js_content (str): JavaScript content to analyze
-        """
-        # Pattern to find function calls: name(args)
+        """Count meaningful function calls in JavaScript, filtering minified noise."""
         pattern = r'(\w+)\s*\('
-        
         for match in re.finditer(pattern, js_content):
-            function_name = match.group(1)
-            
-            # Skip common JavaScript keywords
-            if function_name in ['if', 'for', 'while', 'switch', 'catch']:
+            name = match.group(1)
+            # Skip: short minified identifiers (n, r, Pe…) and language keywords
+            if len(name) < 3 or name in self._CALL_NOISE:
                 continue
-            
-            # Count function calls
-            if function_name in self.function_calls:
-                self.function_calls[function_name] += 1
-            else:
-                self.function_calls[function_name] = 1
+            self.function_calls[name] = self.function_calls.get(name, 0) + 1
     
+    def check_security_headers(self, url, headers):
+        """Record missing or weak HTTP security headers for a single response."""
+        h = {k.lower(): v for k, v in headers.items()}
+        issues = []
+
+        if 'strict-transport-security' not in h:
+            issues.append({'header': 'Strict-Transport-Security', 'issue': 'Missing', 'severity': 'High'})
+
+        if 'content-security-policy' not in h:
+            issues.append({'header': 'Content-Security-Policy', 'issue': 'Missing', 'severity': 'High'})
+
+        # X-Frame-Options OR CSP frame-ancestors
+        has_frame_ancestors = 'frame-ancestors' in h.get('content-security-policy', '')
+        if 'x-frame-options' not in h and not has_frame_ancestors:
+            issues.append({'header': 'X-Frame-Options', 'issue': 'Missing (no CSP frame-ancestors either)', 'severity': 'Medium'})
+
+        if 'x-content-type-options' not in h:
+            issues.append({'header': 'X-Content-Type-Options', 'issue': 'Missing', 'severity': 'Low'})
+
+        if 'referrer-policy' not in h:
+            issues.append({'header': 'Referrer-Policy', 'issue': 'Missing', 'severity': 'Low'})
+
+        if 'x-powered-by' in h:
+            issues.append({'header': 'X-Powered-By', 'issue': f'Exposed: {h["x-powered-by"]}', 'severity': 'Info'})
+
+        if 'server' in h:
+            issues.append({'header': 'Server', 'issue': f'Exposed: {h["server"]}', 'severity': 'Info'})
+
+        # Cookie flags (check raw Set-Cookie header string)
+        set_cookie = headers.get('Set-Cookie', '')
+        if set_cookie:
+            sc_lower = set_cookie.lower()
+            if 'secure' not in sc_lower:
+                issues.append({'header': 'Set-Cookie', 'issue': 'Missing Secure flag', 'severity': 'Medium'})
+            if 'httponly' not in sc_lower:
+                issues.append({'header': 'Set-Cookie', 'issue': 'Missing HttpOnly flag', 'severity': 'Medium'})
+            if 'samesite' not in sc_lower:
+                issues.append({'header': 'Set-Cookie', 'issue': 'Missing SameSite attribute', 'severity': 'Low'})
+
+        if issues:
+            self.security_headers_issues[url] = issues
+
+    def extract_forms(self, url, html_content):
+        """Extract all HTML forms and their inputs for forms_inventory.md."""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            for form in soup.find_all('form'):
+                form_data = {
+                    'url': url,
+                    'action': form.get('action', ''),
+                    'method': form.get('method', 'GET').upper(),
+                    'inputs': []
+                }
+                for inp in form.find_all(['input', 'select', 'textarea']):
+                    name = inp.get('name', '')
+                    if not name:
+                        continue
+                    form_data['inputs'].append({
+                        'name': name,
+                        'type': inp.get('type', 'text' if inp.name != 'select' else 'select'),
+                        'id': inp.get('id', ''),
+                    })
+                if form_data['inputs']:
+                    self.forms_found.append(form_data)
+        except Exception as e:
+            logger.warning(f"Error extracting forms from {url}: {e}")
+
     def analyze_code_files(self):
         """
         Analyze downloaded code files for security issues and function usage
@@ -973,10 +1050,39 @@ class WebScanner:
                         'code': code_line
                     })
 
+        # Extract JS library versions from downloaded file content
+        # (supplements the HTTP-header-only version detection)
+        _js_version_patterns = [
+            (r'[Jj][Qq]uery\s+v(\d+\.\d+[\.\d]*)', 'jQuery'),
+            (r'"jquery":\s*"(\d+\.\d+[\.\d]*)"', 'jQuery'),
+            (r'React\s+v(\d+\.\d+[\.\d]*)', 'React'),
+            (r'"react":\s*"(\d+\.\d+[\.\d]*)"', 'React'),
+            (r'swagger-ui\s+v?(\d+\.\d+[\.\d]*)', 'Swagger UI'),
+            (r'Bootstrap\s+v(\d+\.\d+[\.\d]*)', 'Bootstrap'),
+            (r'"bootstrap":\s*"(\d+\.\d+[\.\d]*)"', 'Bootstrap'),
+            (r'"angular(?:js)?":\s*"(\d+\.\d+[\.\d]*)"', 'Angular'),
+            (r'"vue":\s*"(\d+\.\d+[\.\d]*)"', 'Vue.js'),
+            (r'"lodash":\s*"(\d+\.\d+[\.\d]*)"', 'lodash'),
+            (r'"axios":\s*"(\d+\.\d+[\.\d]*)"', 'axios'),
+            (r'Handlebars\s+v(\d+\.\d+[\.\d]*)', 'Handlebars'),
+            (r'Moment\.js\s+v?(\d+\.\d+[\.\d]*)', 'Moment.js'),
+        ]
+        for file_path, content in self.code_files.items():
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext not in ('.js', '.html'):
+                continue
+            for pattern, lib_name in _js_version_patterns:
+                if f"JS: {lib_name}" in self.detected_versions:
+                    continue
+                m = re.search(pattern, content)
+                if m:
+                    self.detected_versions[f"JS: {lib_name}"] = m.group(1)
+                    logger.info(f"Detected {lib_name} v{m.group(1)} in {file_path}")
+
         # Generate security report using Reporter class (with improved formatting and Berlin time)
         from .reporter import Reporter
         reporter = Reporter(self.target_url, report_dir=self.report_dir, download_dir=self.download_dir)
-        reporter.generate_security_report(security_findings)
+        reporter.generate_security_report(security_findings, url_map=self.file_url_map)
 
         # After generating the security report, also generate a sinks report if sinks exist
         if self.potential_sinks:
@@ -1006,6 +1112,10 @@ class WebScanner:
                 f.write("\n---\n**See [sinks.md](sinks.md) for a summary of potential sink findings.**\n\n")
         # Generate function usage report
         self.generate_function_usage_report()
+        # Generate HTTP security headers report
+        self.generate_headers_report()
+        # Generate forms inventory
+        self.generate_forms_report()
     
     def get_sink_score(self, sink_name):
         """
@@ -1182,6 +1292,95 @@ class WebScanner:
         logger.info(f"Files and directories JSON dump generated: {json_path}")
         return json_path
 
+    def generate_headers_report(self):
+        """Generate http_headers_report.md from security header checks collected during crawl."""
+        if not self.security_headers_issues:
+            return
+        report_path = os.path.join(self.report_dir, 'http_headers_report.md')
+        severity_order = {'High': 0, 'Medium': 1, 'Low': 2, 'Info': 3}
+
+        # Aggregate: for each header issue, count affected URLs
+        header_summary = {}
+        for url, issues in self.security_headers_issues.items():
+            for issue in issues:
+                key = (issue['header'], issue['issue'])
+                if key not in header_summary:
+                    header_summary[key] = {'severity': issue['severity'], 'count': 0}
+                header_summary[key]['count'] += 1
+
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write("# HTTP Security Headers Report\n\n")
+            f.write(f"**Target:** {self.target_url}\n")
+            f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write(f"**URLs Checked:** {len(self.security_headers_issues)}\n\n")
+
+            f.write("## Summary\n\n")
+            f.write("| Header / Issue | Severity | URLs Affected |\n")
+            f.write("|----------------|----------|---------------|\n")
+            for (header, issue_desc), data in sorted(
+                header_summary.items(),
+                key=lambda x: (severity_order.get(x[1]['severity'], 4), x[0][0])
+            ):
+                f.write(f"| `{header}`: {issue_desc} | {data['severity']} | {data['count']} |\n")
+            f.write("\n")
+
+            # Show per-URL detail for first 20 URLs only
+            f.write("## Details (first 20 URLs)\n\n")
+            for url, issues in list(self.security_headers_issues.items())[:20]:
+                f.write(f"### `{url}`\n\n")
+                f.write("| Header / Issue | Severity |\n")
+                f.write("|----------------|----------|\n")
+                for issue in sorted(issues, key=lambda x: severity_order.get(x['severity'], 4)):
+                    f.write(f"| `{issue['header']}`: {issue['issue']} | {issue['severity']} |\n")
+                f.write("\n")
+
+            if len(self.security_headers_issues) > 20:
+                f.write(f"*...{len(self.security_headers_issues) - 20} more URLs checked. See summary above.*\n")
+
+        print(f"[SUMMARY] HTTP headers report: {len(header_summary)} distinct issues across {len(self.security_headers_issues)} URLs")
+        logger.info(f"HTTP headers report generated: {report_path}")
+
+    def generate_forms_report(self):
+        """Generate forms_inventory.md — deduplicated by (action, method, param names)."""
+        if not self.forms_found:
+            return
+        report_path = os.path.join(self.report_dir, 'forms_inventory.md')
+
+        # Deduplicate: same action + method + param set = one entry (keep first URL seen)
+        seen = {}
+        unique_forms = []
+        for form in self.forms_found:
+            key = (
+                form['action'].lower().rstrip('/'),
+                form['method'],
+                tuple(sorted(inp['name'] for inp in form['inputs']))
+            )
+            if key not in seen:
+                seen[key] = True
+                unique_forms.append(form)
+
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write("# Forms & Parameters Inventory\n\n")
+            f.write(f"**Target:** {self.target_url}\n")
+            f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write(f"**Unique Forms Found:** {len(unique_forms)}\n\n")
+            f.write("> Use this list as your primary fuzzing surface for SQLi, XSS, and CSRF.\n\n")
+
+            for i, form in enumerate(unique_forms, 1):
+                action = form['action'] or '(same page)'
+                f.write(f"## Form {i}: `{form['method']} {action}`\n\n")
+                f.write(f"**Example URL:** `{form['url']}`  \n")
+                f.write(f"**Method:** `{form['method']}`  \n")
+                f.write(f"**Action:** `{action}`  \n\n")
+                f.write("| Parameter | Type | ID |\n")
+                f.write("|-----------|------|----|\n")
+                for inp in form['inputs']:
+                    f.write(f"| `{inp['name']}` | {inp['type']} | {inp.get('id', '')} |\n")
+                f.write("\n")
+
+        print(f"[SUMMARY] Forms inventory: {len(unique_forms)} unique forms ({len(self.forms_found)} total incl. duplicates)")
+        logger.info(f"Forms inventory generated: {report_path}")
+
     def generate_final_report(self):
         """
         Generate a final comprehensive report
@@ -1316,24 +1515,64 @@ class WebScanner:
                 if len(self.detected_versions) > len(server_versions) + len(language_versions) + len(framework_versions):
                     f.write("See the complete software versions JSON file for more details.\n\n");
             
-            # Recommendations
+            # --- Dynamic recommendations derived from actual findings ---
+            issue_types_found = set()
+            for fp, fi in self.potential_sinks and {} or {}:
+                pass  # placeholder; read from security_findings below
+            # Read issue types from security_report.md (already written to disk)
+            security_report_path2 = os.path.join(self.report_dir, 'security_report.md')
+            if os.path.exists(security_report_path2):
+                with open(security_report_path2, 'r', encoding='utf-8') as sr2:
+                    for line in sr2:
+                        if line.startswith('**Type:**'):
+                            issue_types_found.add(line.replace('**Type:**', '').strip().rstrip('  '))
+
+            recs = []
+            if 'SQL Injection' in issue_types_found or 'NoSQL Injection' in issue_types_found:
+                recs.append("**Parameterized Queries:** SQL/NoSQL injection patterns detected — use prepared statements or an ORM instead of string concatenation.")
+            if 'XSS' in issue_types_found or 'Use of Dangerous Functions' in issue_types_found:
+                recs.append("**Output Encoding + CSP:** XSS vectors detected — apply context-aware output encoding and add a Content-Security-Policy header.")
+            if 'Open Redirect' in issue_types_found or 'Unvalidated Redirects' in issue_types_found:
+                recs.append("**Redirect Validation:** Open redirect patterns detected — whitelist allowed destinations server-side.")
+            if 'Insecure Crypto' in issue_types_found:
+                recs.append("**Cryptography Review:** Weak crypto patterns detected — use AES-GCM for encryption, bcrypt/Argon2 for password hashing.")
+            if 'Hardcoded Credentials' in issue_types_found:
+                recs.append("**Secrets Management:** Hardcoded credentials detected — move secrets to environment variables or a secrets manager.")
+            if 'File Inclusion' in issue_types_found or 'Path Traversal' in issue_types_found:
+                recs.append("**Path Validation:** File inclusion/path traversal patterns detected — validate and restrict file paths with a whitelist.")
+            if 'CSRF' in issue_types_found:
+                recs.append("**CSRF Tokens:** CSRF patterns detected — ensure all state-changing forms include synchroniser tokens.")
+            if self.detected_versions:
+                recs.append("**Dependency Audit:** Server/library versions fingerprinted — check CVE databases and update vulnerable components.")
+            if self.target_url.startswith('http://'):
+                recs.append("**Enable HTTPS:** Site is served over plain HTTP — deploy TLS and add Strict-Transport-Security header.")
+            if self.security_headers_issues:
+                recs.append("**Security Headers:** Missing headers detected — see [http_headers_report.md](http_headers_report.md) for a full list.")
+            if self.forms_found:
+                recs.append("**Input Validation:** Forms detected — validate and sanitise all inputs server-side; see [forms_inventory.md](forms_inventory.md).")
+            if self.potential_sinks:
+                recs.append("**Sink Review:** Dangerous sinks detected — review [sinks.md](sinks.md) and test each with user-controlled input.")
+            if not recs:
+                recs.append("No specific issues detected. Perform manual review to confirm.")
+
             f.write("## Recommendations\n\n")
-            f.write("Based on the scan results, consider the following recommendations:\n\n")
-            
-            # Add general recommendations
-            f.write("1. **Review Security Issues:** Address any security issues identified in the security report.\n")
-            f.write("2. **Update Dependencies:** Check for outdated libraries and update them to the latest secure versions.\n")
-            f.write("3. **Input Validation:** Implement proper input validation for all user inputs.\n")
-            f.write("4. **Output Encoding:** Use proper output encoding to prevent XSS attacks.\n")
-            f.write("5. **Parameterized Queries:** Use parameterized queries to prevent SQL injection.\n")
-            f.write("6. **Content Security Policy:** Implement a Content Security Policy to mitigate XSS and other injection attacks.\n")
-            f.write("7. **HTTPS:** Ensure the website uses HTTPS with proper certificate configuration.\n")
-            f.write("8. **Rate Limiting:** Implement rate limiting to prevent brute force attacks.\n\n")
-            
-            f.write("## Next Steps\n\n")
-            f.write("1. Review the detailed reports for security issues and function usage.\n")
-            f.write("2. Perform a manual review of high-risk areas identified in the scan.\n")
-            f.write("3. Consider conducting more targeted security tests based on the findings.\n")
+            for n, rec in enumerate(recs, 1):
+                f.write(f"{n}. {rec}\n")
+            f.write("\n")
+
+            f.write("## Reports Generated\n\n")
+            f.write("| Report | Description |\n")
+            f.write("|--------|-------------|\n")
+            f.write("| [security_report.md](security_report.md) | Detailed security findings with code snippets |\n")
+            f.write("| [sinks.md](sinks.md) | Prioritised fuzzing target list |\n")
+            f.write("| [discovered_files_dirs.json](discovered_files_dirs.json) | All visited URLs and downloaded files |\n")
+            f.write("| [discovered_versions.json](discovered_versions.json) | Detected server/library versions |\n")
+            f.write("| [discovered_sensitive_data.json](discovered_sensitive_data.json) | Crypto addresses, IPs, and link map |\n")
+            if self.security_headers_issues:
+                f.write("| [http_headers_report.md](http_headers_report.md) | Missing/weak HTTP security headers |\n")
+            if self.forms_found:
+                f.write("| [forms_inventory.md](forms_inventory.md) | All forms and input parameters |\n")
+            f.write("\n")
         
         logger.info(f"Final report generated: {report_path}")
         

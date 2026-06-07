@@ -140,7 +140,7 @@ class Reporter:
         print(f"[SUMMARY] Discovered files/dirs: {len(downloaded_files)} files, {len(files_dirs['directories'])} directories")
         return json_path
         
-    def generate_security_report(self, security_findings, pattern_map=None):
+    def generate_security_report(self, security_findings, pattern_map=None, url_map=None):
         """
         Generate a human-friendly, numbered, and clearly separated security report.
         Each issue is numbered, separated by ASCII art, and shows the regex pattern above the code snippet.
@@ -234,6 +234,8 @@ class Reporter:
                             # Write a clearly separated, numbered finding
                             f.write(f"-------------------- ISSUE {issue_num} --------------------\n\n")
                             f.write(f"**File:** `{file_path}`  \n")
+                            if url_map and file_path in url_map:
+                                f.write(f"**URL:** `{url_map[file_path]}`  \n")
                             f.write(f"**Type:** {issue_type}  \n")
                             f.write(f"**Line:** {match['line']}\n\n")
                             if pattern_str:
@@ -493,38 +495,29 @@ class Reporter:
 
         # Regex patterns
         crypto_patterns = {
-            # Bitcoin legacy (1/3...) and bech32 (bc1...)
+            # Bitcoin legacy (1/3 prefix) and bech32 (bc1 prefix) — distinctive enough
             'bitcoin': r'\b(?:bc1[a-zA-HJ-NP-Z0-9]{39,59}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b',
-            # Ethereum, BSC, USDT-ERC20
+            # Ethereum — 0x prefix + exactly 40 hex chars (very distinctive)
             'ethereum': r'\b0x[a-fA-F0-9]{40}\b',
-            # Litecoin (L or M prefix, non-capturing)
+            # Litecoin — L/M prefix + base58 (length-constrained)
             'litecoin': r'\b(?:L|M)[a-km-zA-HJ-NP-Z1-9]{26,33}\b',
-            # Dogecoin
+            # Dogecoin — D prefix + specific char range + exact length
             'dogecoin': r'\bD[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}\b',
-            # Monero
+            # Monero — starts with 4, exactly 95 chars (very distinctive)
             'monero': r'\b4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}\b',
-            # Ripple (XRP)
-            'ripple': r'\br[0-9a-zA-Z]{24,34}\b',
-            # Tron, USDT-TRC20
-            'tron': r'\bT[a-zA-Z0-9]{33}\b',
-            # Dash
-            'dash': r'\bX[1-9A-HJ-NP-Za-km-z]{33}\b',
-            # Zcash (t-addr)
-            'zcash': r'\bt1[a-zA-HJ-NP-Z0-9]{33}\b',
-            # Solana
-            'solana': r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b',
-            # Cardano Shelley
+            # Cardano Shelley — distinctive addr1 prefix
             'cardano': r'\baddr1[0-9a-z]{53,87}\b',
-            # Polkadot
-            'polkadot': r'\b1[a-km-zA-HJ-NP-Z1-9]{47}\b',
-            # Cosmos
+            # Cosmos — distinctive cosmos1 prefix
             'cosmos': r'\bcosmos1[0-9a-z]{38}\b',
-            # Avalanche X-Chain
+            # Avalanche X-Chain — distinctive X-avax1 prefix
             'avalanche': r'\bX-avax1[0-9a-z]{38}\b',
-            # Algorand
-            'algorand': r'\b[A-Z2-7]{58}\b',
-            # Stellar
+            # Stellar — G prefix + exactly 55 uppercase/2-7 chars (distinctive)
             'stellar': r'\bG[A-Z2-7]{55}\b',
+            # Algorand — exactly 58 uppercase A-Z + 2-7 (distinctive length)
+            'algorand': r'\b[A-Z2-7]{58}\b',
+            # NOTE: Ripple, Tron, Dash, Zcash, Solana, Polkadot patterns removed —
+            # they over-match JS identifiers (e.g. Solana base58 matches any
+            # 32-44 char token including API method names).
         }
         # Stricter phone number pattern: requires at least 7 digits, usually 9+ (optionally with country code)
         # Matches numbers like +49 123 4567890, (030) 1234567, 0176-12345678, etc.
@@ -551,20 +544,28 @@ class Reporter:
                 addr_counts[addr] = addr_counts.get(addr, 0) + 1
             crypto_addresses[name] = addr_counts
 
-        # Find phone numbers (filter to only those with at least 9 digits)
+        # Find phone numbers — require at least one formatting character (space, dash,
+        # parens) or a + country code prefix so pure integer constants are excluded.
         raw_phone_numbers = phone_pattern.findall(all_text)
         phone_counts = {}
         for match in raw_phone_numbers:
-            digits = re.sub(r'\D', '', match)
-            if len(digits) >= 9:
-                key = match.strip()
-                phone_counts[key] = phone_counts.get(key, 0) + 1
+            stripped = match.strip()
+            digits = re.sub(r'\D', '', stripped)
+            non_digits = re.sub(r'\d', '', stripped)
+            has_formatting = any(c in non_digits for c in (' ', '-', '(', ')'))
+            has_country_code = stripped.startswith('+')
+            if len(digits) >= 9 and (has_formatting or has_country_code):
+                phone_counts[stripped] = phone_counts.get(stripped, 0) + 1
 
-        # Find IP addresses
+        # Find IP addresses — validate all octets are 0–255 (rejects math constants)
         ip_matches = re.findall(ip_pattern, all_text)
         ip_counts = {}
         for ip in ip_matches:
-            ip_counts[ip] = ip_counts.get(ip, 0) + 1
+            try:
+                if all(0 <= int(p) <= 255 for p in ip.split('.')):
+                    ip_counts[ip] = ip_counts.get(ip, 0) + 1
+            except ValueError:
+                pass
 
         # Classify links
         internal_links = set()
