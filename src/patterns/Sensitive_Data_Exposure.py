@@ -36,14 +36,14 @@ sensitive_data_exposure_patterns = [
     r'(?i)BEGIN EC PARAMETERS',
     # TLDR: Detects certificate signing requests
     r'(?i)BEGIN NEW CERTIFICATE REQUEST',
-    # TLDR: Detects password assignments
-    r'(?i)password\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
-    # TLDR: Detects passwd assignments
-    r'(?i)passwd\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
-    # TLDR: Detects pwd assignments
-    r'(?i)pwd\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
-    # TLDR: Detects secret assignments
-    r'(?i)secret\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
+    # Detects password assignments — negative lookbehind excludes "Password:" UI labels
+    r'(?i)(?<!["\'])password\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
+    # Detects passwd assignments
+    r'(?i)(?<!["\'])passwd\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
+    # Detects pwd assignments
+    r'(?i)(?<!["\'])pwd\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
+    # Detects secret assignments
+    r'(?i)(?<!["\'])secret\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects api_key assignments
     r'(?i)api[_-]?key\s*[:=]\s*[\'\"][^\'\"]{6,}[\'\"]',
     # TLDR: Detects apikey assignments

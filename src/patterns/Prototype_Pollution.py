@@ -6,8 +6,8 @@
 
 prototype_pollution_patterns = [
     # Direct __proto__ manipulation — high signal
-    # Exclude: "proto" in {} (feature detection), setPrototypeOf || (...proto...) (polyfill guard)
-    r'(?i)["\']__proto__["\'](?!\s*in\b)',
+    # Exclude: in {} (feature detection), === / !== (safety guard comparisons like "__proto__" === key ? void 0)
+    r'(?i)["\']__proto__["\'](?!\s*(?:in\b|===|!==))',
     r'(?i)\b__proto__\s*=(?!\s*\w+\.prototype)',  # assignment but not proto = Something.prototype (polyfill)
     r'(?i)\[(?:"|\')?__proto__(?:"|\')?\]\s*=',
 
@@ -15,9 +15,9 @@ prototype_pollution_patterns = [
     r'(?i)Object\.setPrototypeOf\s*\(',
     r'(?i)Reflect\.setPrototypeOf\s*\(',
 
-    # defineProperty on prototype — can be exploited
-    r'(?i)Object\.definePropert(?:y|ies)\s*\(\s*\w+\.prototype',
-    r'(?i)Reflect\.definePropert(?:y|ies)\s*\(\s*\w+\.prototype',
+    # defineProperty on Object.prototype specifically — any other .prototype is normal OOP
+    r'(?i)Object\.definePropert(?:y|ies)\s*\(\s*Object\.prototype',
+    r'(?i)Reflect\.definePropert(?:y|ies)\s*\(\s*Object\.prototype',
 
     # URL/query parameter __proto__ injection — both direct and bracket notation
     r'(?i)[?&]__proto__(?:\[|%5b|\s*=)',
