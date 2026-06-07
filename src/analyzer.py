@@ -42,6 +42,9 @@ from .patterns.XML_Injection import xml_injection_patterns
 from .patterns.Insecure_Cookie_Flags import insecure_cookie_flag_patterns
 from .patterns.Use_of_Dangerous_Functions import use_of_dangerous_functions_patterns
 from .patterns.Prototype_Pollution import prototype_pollution_patterns
+from .patterns.Business_Logic_Flaw import business_logic_flaw_patterns
+from .patterns.GraphQL_Injection import graphql_injection_patterns
+from .patterns.WebSocket_Security import websocket_security_patterns
 
 # Load vulnerability descriptions and recommendations from JSON files
 with open(os.path.join(os.path.dirname(__file__), 'patterns', 'vuln_descriptions.json')) as f:
@@ -95,6 +98,9 @@ class SecurityAnalyzer:
             'Clickjacking': clickjacking_patterns,
             'Host Header Injection': host_header_injection_patterns,
             'CVE/RCE Patterns': cve_rce_patterns,
+            'Business Logic Flaw': business_logic_flaw_patterns,
+            'GraphQL Injection': graphql_injection_patterns,
+            'WebSocket Security': websocket_security_patterns,
         }
         
         # Mapping security issues to OWASP Top 10 Categories
@@ -139,6 +145,9 @@ class SecurityAnalyzer:
             'Session Fixation': 'A07:2021-Identification and Authentication Failures',
             'Insufficient Logging & Monitoring': 'A09:2021-Security Logging and Monitoring Failures',
             'CVE/RCE Patterns': 'A06:2021-Vulnerable and Outdated Components',
+            'Business Logic Flaw': 'A04:2021-Insecure Design',
+            'GraphQL Injection': 'A03:2021-Injection',
+            'WebSocket Security': 'A05:2021-Security Misconfiguration',
         }
         
         # Risk levels for each vulnerability type
@@ -183,6 +192,9 @@ class SecurityAnalyzer:
             'Session Fixation': 'High',
             'Insufficient Logging & Monitoring': 'Medium',
             'CVE/RCE Patterns': 'Critical',
+            'Business Logic Flaw': 'High',
+            'GraphQL Injection': 'High',
+            'WebSocket Security': 'Medium',
         }
         
         # Use loaded JSON for descriptions and recommendations

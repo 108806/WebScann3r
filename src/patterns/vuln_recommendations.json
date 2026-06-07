@@ -278,5 +278,26 @@
     "Implement access controls for sensitive data",
     "Regularly audit data access and storage",
     "Educate developers on data protection best practices"
+  ],
+  "Business Logic Flaw": [
+    "Enforce authorization checks server-side for every sensitive operation — never trust client-supplied role or privilege data",
+    "Validate and re-calculate prices, quantities, and totals server-side; reject any client-supplied values",
+    "Use an allowlist (whitelist) for mass assignment — never pass raw request body directly to ORM create/update",
+    "Apply IDOR protection by using indirect object references or verifying ownership before every lookup",
+    "Review application workflows for abuse cases through threat modeling"
+  ],
+  "GraphQL Injection": [
+    "Disable introspection in production environments",
+    "Implement query depth and complexity limits to prevent denial-of-service via nested queries",
+    "Enforce field-level authorization on every resolver — do not rely on top-level auth alone",
+    "Never build GraphQL queries via string concatenation; use parameterised variables instead",
+    "Disable batched HTTP requests unless explicitly required"
+  ],
+  "WebSocket Security": [
+    "Always use wss:// (TLS) instead of ws:// for WebSocket connections",
+    "Validate the Origin header on the server before accepting WebSocket upgrade requests",
+    "Authenticate WebSocket connections using a token or cookie checked before processing any message",
+    "Validate and sanitize all incoming WebSocket message content — never pass it to eval or innerHTML",
+    "Use per-message CSRF tokens or signed connection tickets for state-changing operations"
   ]
 }

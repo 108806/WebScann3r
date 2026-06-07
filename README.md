@@ -9,7 +9,7 @@
                                                              
 ```
 
-A web reconnaissance and static analysis tool for red team assessments. Crawls a target, downloads code files, runs 37 vulnerability pattern categories against them, and produces a suite of pentester-ready reports.
+A web reconnaissance and static analysis tool for red team assessments. Crawls a target, downloads code files, runs 40 vulnerability pattern categories against them, and produces a suite of pentester-ready reports.
 
 ## Features
 
@@ -23,10 +23,10 @@ A web reconnaissance and static analysis tool for red team assessments. Crawls a
 - **Version fingerprinting** — detects server software from HTTP headers and library versions (jQuery, React, Bootstrap, Swagger UI, etc.) from JS file content
 
 ### Security Analysis
-- **37 vulnerability pattern categories** covering OWASP Top 10 and beyond:
+- **40 vulnerability pattern categories** covering OWASP Top 10 and beyond:
   SQLi, XSS, Open Redirect, CSRF, RCE, File Inclusion, Path Traversal, XXE,
-  Prototype Pollution, Insecure Crypto, Hardcoded Credentials, SSRF, SSTI,
-  Deserialization, and more
+  GraphQL Injection, WebSocket Security, Business Logic Flaws, Prototype Pollution,
+  Insecure Crypto, Hardcoded Credentials, SSRF, SSTI, Deserialization, and more
 - **Dangerous sink detection** — identifies taint sinks (eval, exec, innerHTML, SQL queries, file ops, LDAP, JWT, etc.) with priority scoring for fuzzing
 - **False-positive reduction** — word boundaries, negative lookaheads, and quote requirements baked into every pattern to minimise noise
 - **Finding deduplication** — identical matches in minified bundles are reported once, not hundreds of times

@@ -40,5 +40,8 @@
   "Insufficient Logging & Monitoring": "Insufficient logging and monitoring can allow attackers to perform malicious actions without detection, delaying response and remediation.",
   "Sensitive Data Exposure": "Sensitive data exposure occurs when applications do not adequately protect sensitive information such as credentials, credit card numbers, or personal data.",
   "Clickjacking": "Clickjacking is an attack that tricks users into clicking on something different from what the user perceives, potentially revealing confidential information or allowing unauthorized actions.",
-  "Host Header Injection": "Host header injection occurs when applications use unvalidated Host headers, potentially leading to cache poisoning, password reset poisoning, or web cache deception."
+  "Host Header Injection": "Host header injection occurs when applications use unvalidated Host headers, potentially leading to cache poisoning, password reset poisoning, or web cache deception.",
+  "Business Logic Flaw": "Business logic flaws are weaknesses in the intended workflow of an application, allowing attackers to manipulate legitimate functionality — such as bypassing authorization checks, exploiting mass assignment, or manipulating prices and quantities — for malicious purposes.",
+  "GraphQL Injection": "GraphQL security issues arise from improper configuration or insufficient input validation in GraphQL APIs. Common risks include introspection disclosure, missing query depth/complexity limits (DoS), missing authorization on resolvers, and string-concatenated queries vulnerable to injection.",
+  "WebSocket Security": "WebSocket security issues occur when real-time connections are established without proper encryption, origin validation, authentication, or input sanitization. Attackers can intercept unencrypted ws:// traffic, forge connections from untrusted origins, or inject malicious payloads via unvalidated messages."
 }

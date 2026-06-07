@@ -29,4 +29,24 @@ ssrf_vulnerabilities_patterns = [
     r'(?i)gopher://',  # gopher:// SSRF
     r'(?i)dict://',  # dict:// SSRF
     r'(?i)ftp://',  # ftp:// SSRF
+
+    # SSRF bypass: HTTP requests to private/loopback addresses
+    r'(?i)(?:fetch|axios|http\.get|http\.request|requests\.get|requests\.post|urllib\.request\.urlopen|curl)\s*\([^)]*(?:localhost|127\.0\.0\.1|0\.0\.0\.0|::1)\b',
+    r'(?i)(?:fetch|axios|http\.get|requests\.get|requests\.post)\s*\([^)]*(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})',
+    r'(?i)(?:fetch|axios|http\.get|requests\.get)\s*\([^)]*169\.254\.',  # link-local
+
+    # SSRF bypass via unusual IP representations
+    r'\b0x7[fF]\.0x0+\.0x0+\.0x0*1\b',   # hex loopback 0x7f.0x00.0x00.0x01
+    r'\b0177\.0+\.0+\.0*1\b',              # octal loopback 0177.0.0.1
+    r'\b2130706433\b',                      # decimal loopback (127.0.0.1 = 2130706433)
+    r'\b017700000001\b',                    # octal loopback compact
+
+    # Cloud metadata endpoints — high-value SSRF target
+    r'(?i)169\.254\.169\.254',              # AWS/GCP/Azure IMDSv1
+    r'(?i)metadata\.google\.internal',      # GCP metadata
+    r'(?i)169\.254\.170\.2',               # ECS metadata
+
+    # SSRF via user-supplied URL in HTTP client call
+    r'(?i)(?:fetch|axios|http\.(?:get|request)|requests\.(?:get|post|put|delete)|urllib\.request\.urlopen)\s*\(\s*req\.(params|query|body)\.',
+    r'(?i)(?:fetch|axios|requests\.get)\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)',
 ]
