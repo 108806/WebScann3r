@@ -16,6 +16,7 @@ A web reconnaissance and static analysis tool for red team assessments. Crawls a
 ### Crawling & Discovery
 - **Recursive web crawler** with configurable depth and thread count
 - **Multi-domain scope control** — stay on target or follow external links
+- **User-Agent rotation** — picks a random current browser string (Chrome, Firefox, Safari, Edge across Windows/macOS/Linux) per scan so consecutive runs don't share an identical fingerprint
 - **Form extraction** — collects every HTML form (action, method, inputs) during crawl
 - **JavaScript redirect following** — detects and queues `window.location` redirects
 - **Automatic code beautification** — minified JS/HTML/CSS is pretty-printed before analysis, making findings readable
