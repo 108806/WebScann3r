@@ -2,9 +2,11 @@
 
 import argparse
 import logging
+import random
 import sys
 import os
 from src.scanner import WebScanner
+from src.test_targets import TEST_TARGETS
 
 def main():
     banner = r"""
@@ -22,8 +24,10 @@ def main():
     
     parser = argparse.ArgumentParser(description="WebScann3r - A Web Scanning and Mapping Tool for Red Teams")
     
-    # Required arguments
-    parser.add_argument("url", help="Target URL to scan")
+    # Target — optional when --test-target is used
+    parser.add_argument("url", nargs="?", default=None, help="Target URL to scan")
+    parser.add_argument("--test-target", action="store_true",
+                        help="Pick a random public test target (ignores url argument)")
     
     # Optional arguments
     parser.add_argument("-d", "--downloads", help="Base directory for downloads (default: ./targets)", default="targets")
@@ -40,9 +44,18 @@ def main():
     
     args = parser.parse_args()
 
-    # Auto-correct and warn if URL does not start with http/https
-    if not args.url.startswith(('http://', 'https://')):
-        print(f"[WARNING] Target address '{args.url}' does not start with http:// or https://. Assuming https://{args.url}")
+    # Resolve target URL
+    if args.test_target:
+        target = random.choice(TEST_TARGETS)
+        args.url = target["url"]
+        print(f"[TEST TARGET] {target['name']}")
+        print(f"             {target['description']}")
+        print(f"             Stack: {target['stack']}")
+        print(f"             URL:   {args.url}\n")
+    elif args.url is None:
+        parser.error("url is required unless --test-target is specified")
+    elif not args.url.startswith(('http://', 'https://')):
+        print(f"[WARNING] '{args.url}' has no scheme — assuming https://")
         args.url = 'https://' + args.url
     
     # Configure logging based on verbosity

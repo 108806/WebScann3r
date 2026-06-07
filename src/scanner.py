@@ -228,11 +228,22 @@ class WebScanner:
             # Reject URLs that are too long (likely malformed)
             if len(url) > 500:  # Reduced from 2000
                 return False
-                
+
             # Reject paths that don't look like real URLs
             if len(path) > 200:  # Path itself shouldn't be too long
                 return False
-                
+
+            # Reject paths that look like encoded token / session data rather than
+            # real URL paths — e.g. ASP.NET ViewState, JWT segments, SAML tokens.
+            # Heuristic: a single path segment longer than 40 chars consisting
+            # entirely of base64url / base64 characters has no real path structure.
+            if path:
+                segments = [s for s in path.split('/') if s]
+                if segments:
+                    longest = max(segments, key=len)
+                    if len(longest) > 40 and re.match(r'^[A-Za-z0-9+/=_\-]+$', longest):
+                        return False
+
             return True
         except Exception:
             return False
@@ -739,10 +750,21 @@ class WebScanner:
                 if isinstance(style, Tag) and style.string:
                     css_urls = self.extract_urls_from_css(base_url, style.string)
                     discovered_urls.extend(css_urls)
-            # Look for URLs in custom attributes
+            # Look for URLs in custom attributes.
+            # Exclude data-carrying attributes whose values are never real URLs:
+            # 'value' holds form field data (ASP.NET ViewState, tokens, user input);
+            # 'content' holds meta tag values; 'data' / 'name' / 'id' are identifiers.
+            _non_url_attrs = frozenset({
+                'value', 'content', 'data', 'name', 'id', 'class', 'style',
+                'placeholder', 'title', 'alt', 'type', 'method', 'enctype',
+                'autocomplete', 'pattern', 'for', 'label', 'aria-label',
+                'aria-describedby', 'role', 'tabindex', 'disabled', 'checked',
+            })
             for element in soup.find_all():
                 if isinstance(element, Tag):
                     for attr in element.attrs:
+                        if attr.lower() in _non_url_attrs:
+                            continue
                         if attr.lower() not in ['href', 'src', 'action']:
                             value = element.get(attr)
                             if isinstance(value, str) and (value.startswith('http') or value.startswith('/')):
