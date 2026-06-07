@@ -6,8 +6,8 @@
 
 prototype_pollution_patterns = [
     # Direct __proto__ manipulation — high signal
-    # Exclude: in {} (feature detection), === / !== (safety guard comparisons like "__proto__" === key ? void 0)
-    r'(?i)["\']__proto__["\'](?!\s*(?:in\b|===|!==))',
+    # Exclude: in {} (feature detection), == / === / !== (guard comparisons like "__proto__" === key ? void 0)
+    r'(?i)["\']__proto__["\'](?!\s*(?:in\b|!?={2,3}))',
     r'(?i)\b__proto__\s*=(?!\s*\w+\.prototype)',  # assignment but not proto = Something.prototype (polyfill)
     r'(?i)\[(?:"|\')?__proto__(?:"|\')?\]\s*=',
 
