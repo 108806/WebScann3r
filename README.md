@@ -31,6 +31,15 @@ A web reconnaissance and static analysis tool for red team assessments. Crawls a
 - **False-positive reduction** — word boundaries, negative lookaheads, and quote requirements baked into every pattern to minimise noise
 - **Finding deduplication** — identical matches in minified bundles are reported once, not hundreds of times
 
+### API Probing (post-crawl active phase)
+After the crawl, WebScann3r runs a targeted active probe against discovered API endpoints using only GET and OPTIONS requests:
+- **Swagger / OpenAPI spec discovery** — probes 22 well-known spec paths; parses JSON/YAML specs to extract all endpoints, parameters, and auth schemes
+- **Auth boundary detection** — GETs each endpoint without credentials; flags HTTP 200 responses (potential broken access control)
+- **CORS misconfiguration** — sends attacker-controlled and `null` origins; flags reflection + `Access-Control-Allow-Credentials: true` (High severity)
+- **Version disclosure** — probes `/health`, `/actuator/*`, `/metrics`, `/debug/vars`, etc. for JSON body version fields and version-specific HTTP headers
+- **HTTP method enumeration** — OPTIONS each endpoint; flags PUT, DELETE, TRACE, PATCH in the Allow header
+- **JS intelligence** — extracts API base URL constants (`API_BASE_URL`, `baseURL`, `axios.defaults`) and auth header patterns from downloaded JS
+
 ### Reporting
 - **12 reports per scan** — see full list below
 - **URL annotations** — every security finding shows the live URL alongside the local file name

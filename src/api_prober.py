@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-API Prober — post-crawl active probing of discovered API endpoints.
+API Prober --post-crawl active probing of discovered API endpoints.
 
 Only makes GET and OPTIONS requests (no mutation). Orchestrates six checks:
   1. Swagger / OpenAPI spec discovery + parsing
@@ -48,6 +48,12 @@ VERSION_PATHS = [
 
 DANGEROUS_METHODS = {'PUT', 'DELETE', 'TRACE', 'CONNECT', 'PATCH'}
 
+# Extensions that should always be public --skip from auth boundary probe
+_STATIC_EXTS = frozenset((
+    '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico',
+    '.woff', '.woff2', '.ttf', '.eot', '.map', '.webp', '.gif',
+))
+
 _CORS_EVIL = 'https://evil-attacker.com'
 _CORS_NULL = 'null'
 
@@ -80,12 +86,13 @@ _AUTH_HEADER_PATTERNS = [
     re.compile(r'(?:apiKey|api_key|authToken|auth_token)\s*[=:]\s*["\'][^"\']{8,}["\']'),
 ]
 
-# Version disclosure HTTP headers to check per endpoint
+# Version-specific headers to flag in version disclosure probe.
+# Server and X-Powered-By are intentionally excluded --they are already
+# captured by the HTTP headers report (http_headers_report.md).
 _VERSION_HEADERS = (
     'X-API-Version', 'X-App-Version', 'X-Build-ID', 'X-Revision',
-    'X-Powered-By', 'Server', 'X-Runtime', 'X-Version',
-    'X-Application-Version', 'X-Generator', 'X-AspNet-Version',
-    'X-AspNetMvc-Version',
+    'X-Runtime', 'X-Version', 'X-Application-Version', 'X-Generator',
+    'X-AspNet-Version', 'X-AspNetMvc-Version', 'X-Request-Id',
 )
 
 
@@ -180,7 +187,7 @@ class ApiProber:
                     self.swagger_specs[url] = {
                         'type': 'swagger_ui', 'url': url, 'endpoints': [],
                         'auth_schemes': [],
-                        'note': 'Swagger UI / ReDoc HTML interface — spec JSON URL may be embedded',
+                        'note': 'Swagger UI / ReDoc HTML interface; spec JSON URL may be embedded in page',
                     }
                     found += 1
 
@@ -240,7 +247,11 @@ class ApiProber:
 
     def probe_auth(self):
         """GET each endpoint without auth; flag any that return HTTP 200."""
-        endpoints = list(self.api_endpoints)[:60]
+        # Skip static assets --they are always public by design
+        endpoints = [
+            url for url in self.api_endpoints
+            if not any(urlparse(url).path.lower().endswith(ext) for ext in _STATIC_EXTS)
+        ][:60]
         print(f"[API]      Auth boundary probe: {len(endpoints)} endpoint(s)...")
         unauth = 0
 
@@ -265,14 +276,14 @@ class ApiProber:
                     unauth += 1
                     self.auth_findings.append({
                         'url': url, 'status': 200, 'severity': 'Medium',
-                        'note': 'Returns HTTP 200 without credentials — verify if this should be public',
+                        'note': 'Returns HTTP 200 without credentials --verify if this should be public',
                     })
                 elif status == 401:
                     entry['auth_note'] = 'Auth required (401)'
                 elif status == 403:
                     entry['auth_note'] = 'Forbidden (403)'
 
-        print(f"[API]      Auth probe done — {unauth} endpoint(s) respond 200 without auth")
+        print(f"[API]      Auth probe done -- {unauth} endpoint(s) respond 200 without auth")
 
     # ── Feature 3: CORS ───────────────────────────────────────────────────────
 
@@ -299,7 +310,7 @@ class ApiProber:
                         found.append({
                             'url': url, 'origin_sent': origin, 'acao': acao, 'acac': acac,
                             'acam': acam, 'severity': 'Medium',
-                            'note': 'Wildcard ACAO — any origin may read unauthenticated responses',
+                            'note': 'Wildcard ACAO --any origin may read unauthenticated responses',
                         })
                     elif acao == origin or (origin == _CORS_NULL and acao == 'null'):
                         sev = 'High' if acac == 'true' else 'Medium'
@@ -307,7 +318,7 @@ class ApiProber:
                             'url': url, 'origin_sent': origin, 'acao': acao, 'acac': acac,
                             'acam': acam, 'severity': sev,
                             'note': (
-                                'Origin reflected + credentials=true — cross-site authenticated reads possible'
+                                'Origin reflected + credentials=true --cross-site authenticated reads possible'
                                 if acac == 'true' else 'Arbitrary origin reflected by server'
                             ),
                         })
@@ -322,7 +333,7 @@ class ApiProber:
                 self.cors_findings.extend(batch)
                 issues += len(batch)
 
-        print(f"[API]      CORS probe done — {issues} CORS issue(s) found")
+        print(f"[API]      CORS probe done -- {issues} CORS issue(s) found")
 
     # ── Feature 4: Version disclosure ─────────────────────────────────────────
 
@@ -362,13 +373,20 @@ class ApiProber:
                     found += 1
                     logger.info(f"[API] Version disclosure at {url}")
 
-        print(f"[API]      Version probe done — {found} disclosure endpoint(s) found")
+        print(f"[API]      Version probe done -- {found} disclosure endpoint(s) found")
 
     # ── Feature 5: HTTP method enumeration ────────────────────────────────────
 
     def probe_methods(self):
         """OPTIONS each endpoint; flag dangerous methods in the Allow header."""
-        endpoints = list(self.api_endpoints)[:60]
+        # Skip static assets and 404/410 endpoints.
+        # OPTIONS on a missing or static resource reflects the server's global Allow
+        # header, not the access policy of the endpoint itself.
+        endpoints = [
+            url for url in self.api_endpoints
+            if not any(urlparse(url).path.lower().endswith(ext) for ext in _STATIC_EXTS)
+            and self.endpoint_results.get(url, {}).get('auth_status') not in (404, 410)
+        ][:60]
         print(f"[API]      Method enumeration: {len(endpoints)} endpoint(s)...")
         dangerous_total = 0
 
@@ -400,7 +418,7 @@ class ApiProber:
                             'note': f"Accepts: {', '.join(dangerous)}",
                         })
 
-        print(f"[API]      Method probe done — {dangerous_total} endpoint(s) with dangerous methods")
+        print(f"[API]      Method probe done -- {dangerous_total} endpoint(s) with dangerous methods")
 
     # ── Orchestration ─────────────────────────────────────────────────────────
 
@@ -415,7 +433,7 @@ class ApiProber:
         print(f"{'-' * 60}")
         total = (len(self.auth_findings) + len(self.cors_findings) +
                  len(self.method_findings) + len(self.version_findings) + len(self.swagger_specs))
-        print(f"[API]      Probe complete — {total} finding(s)\n")
+        print(f"[API]      Probe complete -- {total} finding(s)\n")
 
     # ── Report generation ─────────────────────────────────────────────────────
 
@@ -483,7 +501,7 @@ class ApiProber:
                                 summary = (ep.get('summary') or '')[:55]
                                 f.write(f"| `{ep['method']}` | `{ep['path']}` | {summary} | {auth} |\n")
                             if len(eps) > 60:
-                                f.write(f"\n_...and {len(eps)-60} more — full list in api_details.json_\n")
+                                f.write(f"\n_...and {len(eps)-60} more --full list in api_details.json_\n")
                             f.write("\n")
             else:
                 f.write("No Swagger/OpenAPI specs found at common paths.\n\n")
@@ -498,14 +516,14 @@ class ApiProber:
                 f.write("\n> These may be intentionally public. Verify manually that sensitive data or "
                         "state-changing operations are not exposed.\n\n")
             else:
-                f.write("All probed endpoints returned 401/403 — no unauthenticated 200 responses detected.\n\n")
+                f.write("All probed endpoints returned 401/403 --no unauthenticated 200 responses detected.\n\n")
 
             # 3. CORS
             f.write("---\n\n## 3. CORS Misconfigurations\n\n")
             if self.cors_findings:
                 high = [x for x in self.cors_findings if x['severity'] == 'High']
                 med  = [x for x in self.cors_findings if x['severity'] == 'Medium']
-                f.write(f"**{len(self.cors_findings)} CORS issue(s)** — {len(high)} High, {len(med)} Medium:\n\n")
+                f.write(f"**{len(self.cors_findings)} CORS issue(s)** --{len(high)} High, {len(med)} Medium:\n\n")
                 f.write("| URL | Origin Sent | ACAO | Credentials | Severity | Finding |\n")
                 f.write("|-----|-------------|------|-------------|----------|---------|\n")
                 for item in sorted(self.cors_findings, key=lambda x: (x['severity'] != 'High', x['url'])):
