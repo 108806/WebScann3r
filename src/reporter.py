@@ -498,8 +498,7 @@ class Reporter:
             'bitcoin': r'\b(?:bc1[a-zA-HJ-NP-Z0-9]{39,59}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b',
             # Ethereum — 0x prefix + exactly 40 hex chars (very distinctive)
             'ethereum': r'\b0x[a-fA-F0-9]{40}\b',
-            # Litecoin — L/M prefix + base58 (length-constrained)
-            'litecoin': r'\b(?:L|M)[a-km-zA-HJ-NP-Z1-9]{26,33}\b',
+            # Litecoin: removed — L/M+base58 charset matches JS class names (MaxListenersExceededWarning etc.)
             # Dogecoin — D prefix + specific char range + exact length
             'dogecoin': r'\bD[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}\b',
             # Monero — starts with 4, exactly 95 chars (very distinctive)
@@ -543,17 +542,24 @@ class Reporter:
                 addr_counts[addr] = addr_counts.get(addr, 0) + 1
             crypto_addresses[name] = addr_counts
 
-        # Find phone numbers — require at least one formatting character (space, dash,
-        # parens) or a + country code prefix so pure integer constants are excluded.
+        # Find phone numbers — require at least one hard formatting character (dash
+        # or parens) or a + country code.  Space alone is NOT sufficient because
+        # space-separated integer sequences (CSS values, binary data, JS arrays)
+        # produce too many false positives.
         raw_phone_numbers = phone_pattern.findall(all_text)
         phone_counts = {}
         for match in raw_phone_numbers:
             stripped = match.strip()
             digits = re.sub(r'\D', '', stripped)
             non_digits = re.sub(r'\d', '', stripped)
-            has_formatting = any(c in non_digits for c in (' ', '-', '(', ')'))
+            has_dash = '-' in non_digits
+            has_balanced_parens = '(' in non_digits and ')' in non_digits
             has_country_code = stripped.startswith('+')
-            if len(digits) >= 9 and (has_formatting or has_country_code):
+            # Reject if parens are unbalanced — those are JS function call args like (4294967295
+            if '(' in non_digits and ')' not in non_digits:
+                continue
+            has_strong_formatting = has_dash or has_balanced_parens
+            if len(digits) >= 9 and (has_strong_formatting or has_country_code):
                 phone_counts[stripped] = phone_counts.get(stripped, 0) + 1
 
         # Find IP addresses — validate all octets are 0–255 (rejects math constants)
@@ -566,6 +572,10 @@ class Reporter:
             except ValueError:
                 pass
 
+        # Regex/JS metacharacters that never appear unencoded in real URL paths.
+        # Used to filter out garbage URLs extracted from JS regex literals.
+        _path_meta_chars = set('()[]{}^|;')
+
         # Classify links
         internal_links = set()
         external_links = set()
@@ -574,6 +584,10 @@ class Reporter:
         for url in visited_urls:
             parsed = urlparse(url)
             if not parsed.netloc:
+                continue
+            # Skip URLs whose path contains regex metacharacters — these are JS
+            # regex literals that the extractor mistook for URL paths.
+            if any(c in parsed.path for c in _path_meta_chars):
                 continue
             domain = parsed.netloc.lower()
             if domain == base_domain:

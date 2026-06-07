@@ -1,7 +1,7 @@
 # Patterns for Software Library Versions (expanded and well-commented)
 software_library_versions_patterns = [
     # Existing patterns
-    r'(?i)([a-zA-Z0-9_\-]+)[-_=]v?(\d+\.\d+(?:\.\d+)?)',
+    r'(?i)([a-zA-Z][a-zA-Z0-9_\-]{2,})[-_=]v?(\d+\.\d+(?:\.\d+)?)',
     r'(?i)version\s*[:=]\s*[\'\"]?(\d+\.\d+(?:\.\d+)?)[\'\"]?',
     r'(?i)\bpackage.json\b',
     r'(?i)\brequirements.txt\b',

@@ -182,16 +182,17 @@ class WebScanner:
             # Check for dangerous characters that could cause filesystem issues
             dangerous_chars = ['<', '>', '|', '&', '?', '*', ':', '"', '\\']
             path = parsed.path
-            
+
             # Allow some regex chars in paths but reject obvious regex patterns
             if any(char in path for char in dangerous_chars):
                 return False
-                
-            # Reject URLs that look like regex patterns - more strict check
-            regex_indicators = [r'\[', r'\]', r'\(', r'\)', r'\^', r'\$', r'\+', r'\*', r'\?', r'\.', r'|', r';', r'=', r',']
-            if any(indicator in path for indicator in regex_indicators):
+
+            # Reject paths containing regex/JS metacharacters that never appear in real URLs
+            # (these are literal single characters, NOT escaped sequences)
+            regex_indicators = ['[', ']', '(', ')', '^', '|', ';', '{', '}']
+            if any(char in path for char in regex_indicators):
                 return False
-                
+
             # Reject URLs with suspicious content that looks like JavaScript
             js_indicators = ['function(', '.fn.', '$.', 'arguments.length', '/g,', '/i,']
             if any(indicator in path for indicator in js_indicators):
@@ -876,22 +877,28 @@ class WebScanner:
     def should_process_url(self, url):
         """
         Check if a URL should be processed
-        
+
         Args:
             url (str): URL to check
-            
+
         Returns:
             bool: Whether the URL should be processed
         """
         # Skip already visited URLs
         if url in self.visited_urls:
             return False
-        
+
         # Parse the URL
         parsed_url = urlparse(url)
-        
+
         # Skip URLs with unsupported schemes
         if parsed_url.scheme not in ['http', 'https']:
+            return False
+
+        # For fully-qualified URLs, run the full path-safety check.
+        # This catches garbage URLs (JS regex literals, HTTP header names, etc.)
+        # that may have slipped through extraction paths that don't call is_valid_url.
+        if parsed_url.netloc and not self.is_valid_url(url):
             return False
         
         # Skip fragments within the same page
@@ -1018,18 +1025,35 @@ class WebScanner:
         """
         Analyze downloaded code files for security issues and function usage
         """
+        import hashlib
         logger.info("Starting code analysis...")
+
+        # Deduplicate files by content hash — SPA sites (e.g. React) serve the same
+        # index.html at every route, producing dozens of identical copies.  Keep only
+        # the first path encountered for each unique content hash so findings are not
+        # inflated by repeated analysis of the same bytes.
+        _seen_content = {}
+        code_files = {}
+        for path, content in self.code_files.items():
+            h = hashlib.md5(content.encode('utf-8', errors='replace')).hexdigest()
+            if h not in _seen_content:
+                _seen_content[h] = path
+                code_files[path] = content
+        skipped = len(self.code_files) - len(code_files)
+        if skipped:
+            logger.info(f"Content dedup: skipped {skipped} duplicate file(s) (identical content)")
+
         from .analyzer import SecurityAnalyzer
         analyzer = SecurityAnalyzer()
-        security_findings = analyzer.analyze_code(self.code_files)
+        security_findings = analyzer.analyze_code(code_files)
 
         # ── Sink detection ─────────────────────────────────────────────────────
         # Deduplicate by (file, sink_text) to avoid minified-bundle floods.
-        total_files = len(self.code_files)
+        total_files = len(code_files)
         idx_w = len(str(total_files))
         print(f"[SINKS]    Scanning {total_files} file{'s' if total_files != 1 else ''} for dangerous sinks...")
         _seen_sinks = set()
-        for file_idx, (file_path, content) in enumerate(self.code_files.items(), 1):
+        for file_idx, (file_path, content) in enumerate(code_files.items(), 1):
             file_name = os.path.basename(file_path)
             # Rolling progress line — overwritten each iteration for clean-file noise suppression
             progress = f"  [{file_idx:>{idx_w}}/{total_files}]  Scanning {file_name}..."
@@ -1039,10 +1063,13 @@ class WebScanner:
             if extension == '.js':
                 self.count_js_function_calls(content)
             file_sinks = []
+            # Dedup by (basename, sink_text) so SPA sites that serve the same
+            # HTML at many routes (e.g. React on every path) don't flood sinks.md
+            file_basename = os.path.basename(file_path)
             for sink_pat in sink_patterns:
                 for match in re.finditer(sink_pat, content):
                     sink_text = match.group(0).strip().rstrip('(').rstrip()
-                    dedup_key = (file_path, sink_text.lower())
+                    dedup_key = (file_basename, sink_text.lower())
                     if dedup_key in _seen_sinks:
                         continue
                     _seen_sinks.add(dedup_key)
@@ -1082,7 +1109,7 @@ class WebScanner:
             (r'Handlebars\s+v(\d+\.\d+[\.\d]*)', 'Handlebars'),
             (r'Moment\.js\s+v?(\d+\.\d+[\.\d]*)', 'Moment.js'),
         ]
-        for file_path, content in self.code_files.items():
+        for file_path, content in code_files.items():
             ext = os.path.splitext(file_path)[1].lower()
             if ext not in ('.js', '.html'):
                 continue

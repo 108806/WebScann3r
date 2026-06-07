@@ -24,7 +24,7 @@ hardcoded_credentials_patterns = [
     r'(?i)ftp://[^:]+:[^@]+@', # FTP URI with creds
     r'(?i)smtp://[^:]+:[^@]+@', # SMTP URI with creds
     r'(?i)git://[^:]+:[^@]+@', # Git URI with creds
-    r'(?i)https?://[^\s:@]+:[^\s:@]+@[^\s]+', # HTTP URI with embedded creds (user:pass@host)
+    r'(?i)https?://[^\s:@/?#]+:[^\s:@/?#]+@[^\s]+', # HTTP URI with embedded creds — disallow / ? # in user:pass to avoid CDN query-string FPs
     r'(?i)"auth"\s*:\s*"[^"]{8,}"', # JSON auth field (min 8 chars to exclude "type" metadata)
     r'(?i)"password"\s*:\s*"[^"]{8,}"', # JSON password field (min 8 chars)
     r'(?i)"token"\s*:\s*"[^"]{8,}"', # JSON token field (min 8 chars)

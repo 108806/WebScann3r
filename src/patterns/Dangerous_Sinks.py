@@ -17,7 +17,7 @@ sink_patterns = [
     r'(?i)(?<!\.)\beval\s*\(',           # eval() but not .eval() (JS method)
     r'(?i)(?<!\.)\bexec\s*\(',           # exec() but not .exec() (RegExp.exec)
     r'(?i)system\s*\(',
-    r'(?i)popen\s*\(',
+    r'(?i)(?<!\.)\bpopen\s*\(',
     r'(?i)passthru\s*\(',
     r'(?i)proc_open\s*\(',
     r'(?i)shell_exec\s*\(',
