@@ -99,6 +99,13 @@ _SEARCH_PARAMS = frozenset({
     'term', 'terms', 'find', 'k', 'text', 'phrase', 'w',
 })
 
+# CMS pagination pattern: path ends with ,<number> (e.g. /news,45 /news,4440).
+# Distinct from post IDs which use ,p<number> (e.g. /news_some-article,p1234).
+# Only the first _MAX_PAGINATION_OFFSET items (roughly 20 pages at 15/page)
+# are crawled; deep archive pages are identical templates and waste page budget.
+_PAGINATION_SUFFIX_RE = re.compile(r',(\d+)$')
+_MAX_PAGINATION_OFFSET = 300
+
 class WebScanner:
     def __init__(self, target_url, download_dir='targets', report_dir='targets', same_domain_only=True,
                  download_media=False, download_archives=False, download_text=False, threads=15, timeout=20,
@@ -1076,6 +1083,13 @@ class WebScanner:
             qs_keys = set(parse_qs(parsed_url.query).keys())
             if qs_keys and qs_keys.issubset(_SEARCH_PARAMS):
                 return False
+
+        # Skip deep CMS pagination pages: /section,300+ are archive listing pages
+        # (same template, older content) that burn page budget without adding new
+        # attack surface. Individual posts are discovered from the first few pages.
+        m = _PAGINATION_SUFFIX_RE.search(parsed_url.path)
+        if m and int(m.group(1)) > _MAX_PAGINATION_OFFSET:
+            return False
 
         # For fully-qualified URLs, run the full path-safety check.
         # This catches garbage URLs (JS regex literals, HTTP header names, etc.)
