@@ -39,6 +39,7 @@ def main():
     parser.add_argument("--depth", help="Maximum crawling depth for same-domain scanning (default: 3)", type=int, default=3)
     parser.add_argument("-j", "--threads", help="Number of concurrent threads (default: 15)", type=int, default=15)
     parser.add_argument("--timeout", help="Request timeout in seconds (default: 20)", type=int, default=20)
+    parser.add_argument("--max-pages", help="Maximum pages to crawl (default: 2000, 0 = unlimited)", type=int, default=2000, dest="max_pages")
     parser.add_argument("-v", "--verbose", help="Enable verbose output", action="store_true")
     parser.add_argument("-q", "--quiet", help="Suppress all output except errors", action="store_true")
     
@@ -82,7 +83,8 @@ def main():
             download_archives=args.archives,
             download_text=args.text,
             threads=args.threads,
-            timeout=args.timeout
+            timeout=args.timeout,
+            max_pages=args.max_pages,
         )
         
         # Start scanning

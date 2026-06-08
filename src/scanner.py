@@ -4,7 +4,9 @@ import os
 import re
 import threading
 import requests
-from urllib.parse import urlparse, urljoin
+import sys
+import io
+from urllib.parse import urlparse, urljoin, urlunparse, parse_qs
 import logging
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
@@ -40,8 +42,14 @@ class ColorFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
-# Configure logging with colors
-handler = logging.StreamHandler()
+# Configure logging with colors.
+# Use UTF-8 with replacement so non-Latin characters (e.g. Polish ń, ł) in URLs
+# don't crash the handler on Windows cp1252 consoles.
+try:
+    _log_stream = open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', closefd=False)
+except Exception:
+    _log_stream = sys.stdout
+handler = logging.StreamHandler(stream=_log_stream)
 handler.setFormatter(ColorFormatter())
 file_handler = logging.FileHandler("webscann3r.log")
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
@@ -58,13 +66,46 @@ sink_score_map_path = os.path.join(os.path.dirname(__file__), 'patterns', 'sink_
 with open(sink_score_map_path, 'r', encoding='utf-8') as f:
     sink_score_map = json.load(f)
 
+# Domains that are never crawled even in --all-domains mode.
+# These are social networks, CDNs, and analytics services that would
+# consume the entire page budget without adding recon value.
+_EXTERNAL_DENYLIST = frozenset({
+    'facebook.com', 'www.facebook.com', 'connect.facebook.net', 'm.facebook.com',
+    'twitter.com', 'www.twitter.com', 't.co', 'x.com', 'www.x.com',
+    'instagram.com', 'www.instagram.com',
+    'linkedin.com', 'www.linkedin.com',
+    'youtube.com', 'www.youtube.com', 'youtu.be',
+    'tiktok.com', 'www.tiktok.com',
+    'reddit.com', 'www.reddit.com',
+    'pinterest.com', 'www.pinterest.com',
+    'whatsapp.com', 'www.whatsapp.com',
+    'telegram.org', 'www.telegram.org',
+    'vimeo.com', 'player.vimeo.com',
+    'google.com', 'www.google.com', 'google.pl', 'google.co.uk', 'google.de',
+    'googleapis.com', 'gstatic.com', 'googletagmanager.com',
+    'google-analytics.com', 'analytics.google.com',
+    'doubleclick.net',
+    'fonts.googleapis.com', 'fonts.gstatic.com', 'ajax.googleapis.com',
+    'cloudflare.com', 'cdnjs.cloudflare.com',
+    'bootstrapcdn.com', 'maxcdn.bootstrapcdn.com',
+    'code.jquery.com', 'jsdelivr.net', 'cdn.jsdelivr.net', 'unpkg.com',
+})
+
+# Query parameter names that indicate a free-text search — URLs whose entire
+# query string consists only of these params return the same page template with
+# different results and are not worth crawling individually.
+_SEARCH_PARAMS = frozenset({
+    'q', 'qt', 'query', 's', 'search', 'keyword', 'keywords',
+    'term', 'terms', 'find', 'k', 'text', 'phrase', 'w',
+})
+
 class WebScanner:
-    def __init__(self, target_url, download_dir='targets', report_dir='targets', same_domain_only=True, 
+    def __init__(self, target_url, download_dir='targets', report_dir='targets', same_domain_only=True,
                  download_media=False, download_archives=False, download_text=False, threads=15, timeout=20,
-                 max_depth=3):  # Set default max_depth to 3
+                 max_depth=3, max_pages=2000):
         """
         Initialize the web scanner
-        
+
         Args:
             target_url (str): Target URL to scan
             download_dir (str): Base directory to save downloaded files
@@ -76,11 +117,16 @@ class WebScanner:
             threads (int): Number of threads for concurrent requests
             timeout (int): Request timeout in seconds
             max_depth (int): Maximum depth to crawl (default 3)
+            max_pages (int): Maximum total pages to visit (default 300, 0 = unlimited)
         """
         self.target_url = target_url
         self.base_domain = urlparse(target_url).netloc
+        # Normalise base domain: strip leading 'www.' so that michalowice.pl and
+        # www.michalowice.pl are treated as the same site.
+        self._base_domain_bare = self.base_domain.removeprefix('www.')
         self.same_domain_only = same_domain_only
         self.max_depth = 3 if max_depth is None else max_depth
+        self.max_pages = max_pages
         self.download_media = download_media
         self.download_archives = download_archives
         self.download_text = download_text
@@ -175,8 +221,12 @@ class WebScanner:
         # Dictionary to store potential sinks
         self.potential_sinks = []
         
-        # Fix #5: lock for thread-safe URL deduplication
+        # Lock for thread-safe URL deduplication
         self._visited_lock = threading.Lock()
+
+        # Reference counts: how many pages link to each URL.
+        # Used to boost priority of heavily-referenced URLs in the crawl queue.
+        self._url_ref_counts = {}
 
         # Counters for download success/failure
         self.successful_downloads = 0
@@ -247,58 +297,122 @@ class WebScanner:
             return True
         except Exception:
             return False
-    
+
+    def _normalize_url(self, url):
+        """
+        Canonical form for deduplication: lowercase scheme+host, strip trailing
+        slash from path, drop fragment.  Prevents double-visiting /page and /page/,
+        or http://host and https://host/, which map to the same content.
+        """
+        try:
+            p = urlparse(url)
+            return urlunparse((
+                p.scheme.lower(),
+                p.netloc.lower(),
+                p.path.rstrip('/') or '/',
+                p.params,
+                p.query,
+                '',          # no fragment
+            ))
+        except Exception:
+            return url
+
+    def _url_priority(self, url):
+        """
+        Priority score for the crawl queue — lower score = processed sooner.
+
+        Formula: path_depth * 100 - ref_count
+
+        - Shallow URLs are visited before deep ones (path depth is the primary factor).
+        - Among URLs at the same depth, those referenced more often are visited first.
+        - A depth-2 URL referenced 150+ times can outrank a depth-1 URL with 1 reference,
+          because such pages are clearly navigation hubs worth visiting early.
+        """
+        try:
+            path = urlparse(url).path
+            path_depth = len([s for s in path.split('/') if s])
+        except Exception:
+            path_depth = 99
+        ref_count = self._url_ref_counts.get(url, 1)
+        return path_depth * 100 - ref_count
+
     def start_scan(self):
         """
         Start the scanning process
         """
         logger.info(f"Starting scan on {self.target_url}")
-        logger.info(f"Domain scope: {'Same domain only' if self.same_domain_only else 'All domains'}")
+        logger.info(f"Domain scope: {'Same domain only' if self.same_domain_only else 'All domains (social/CDN domains excluded)'}")
         if self.max_depth is not None:
             logger.info(f"Depth limit: {self.max_depth}")
+        if self.max_pages:
+            logger.info(f"Page cap: {self.max_pages}")
         logger.info(f"Download settings - Media: {self.download_media}, Archives: {self.download_archives}, Text: {self.download_text}")
         
         start_time = time.time()
         
+        # Normalize start URL so visited_urls uses canonical form from the beginning.
+        start_url = self._normalize_url(self.target_url)
+
         # Queue of URLs to scan with their depth
-        urls_to_scan = [(self.target_url, 0)]  # (url, depth)
-        
+        urls_to_scan = [(start_url, 0)]
+
         # Track URL depths
-        self.url_depths = {self.target_url: 0}
+        self.url_depths = {start_url: 0}
         
         # Start scanning
         while urls_to_scan:
             with ThreadPoolExecutor(max_workers=self.threads) as executor:
-                # Prepare new batch of URLs
-                current_batch = urls_to_scan[:100]  # Process 100 URLs at a time
+                # Pick the highest-priority batch from the front of the sorted queue.
+                current_batch = urls_to_scan[:100]
                 urls_to_scan = urls_to_scan[100:]
-                
+
                 # Process URLs in parallel
                 future_to_url = {executor.submit(self.process_url, url, depth): (url, depth) for url, depth in current_batch}
-                
+
                 for future in future_to_url:
                     url, current_depth = future_to_url[future]
                     try:
                         new_urls = future.result()
-                        # Add new discovered URLs to the queue if they haven't been visited
                         next_depth = current_depth + 1
-                        
-                        # Only add URLs if we haven't reached the max depth
-                        if self.max_depth is None or next_depth <= self.max_depth:
-                            for new_url in new_urls:
-                                if new_url not in self.visited_urls and (new_url not in self.url_depths or next_depth < self.url_depths[new_url]):
-                                    self.url_depths[new_url] = next_depth
-                                    urls_to_scan.append((new_url, next_depth))
+
+                        # Normalize and count references for every discovered URL.
+                        # Normalization (trailing-slash strip, scheme lowercase) ensures
+                        # /page and /page/ are treated as the same key throughout.
+                        normalized_new = []
+                        for raw_url in new_urls:
+                            if '#' in raw_url:
+                                raw_url = raw_url.split('#')[0]
+                            if not raw_url:
+                                continue
+                            norm = self._normalize_url(raw_url)
+                            self._url_ref_counts[norm] = self._url_ref_counts.get(norm, 0) + 1
+                            normalized_new.append(norm)
+
+                        # Only enqueue if depth and page cap allow.
+                        depth_ok = self.max_depth is None or next_depth <= self.max_depth
+                        pages_ok = not self.max_pages or (len(self.visited_urls) + len(urls_to_scan)) < self.max_pages
+                        if depth_ok and pages_ok:
+                            for norm in normalized_new:
+                                if norm not in self.visited_urls and (norm not in self.url_depths or next_depth < self.url_depths[norm]):
+                                    self.url_depths[norm] = next_depth
+                                    urls_to_scan.append((norm, next_depth))
                     except Exception as exc:
                         logger.error(f"Error processing {url}: {exc}")
                         traceback.print_exc()
                         self.failed_downloads += 1
                         self.failed_files.append(url)
+
+                # Re-sort the pending queue by priority so the next batch picks
+                # the most important URLs first: shallowest path depth first,
+                # broken by highest reference count.
+                urls_to_scan.sort(key=lambda t: self._url_priority(t[0]))
         
         # After scanning, analyze the code files
         self.analyze_code_files()
-        
+
         end_time = time.time()
+        if self.max_pages and len(self.visited_urls) >= self.max_pages:
+            logger.warning(f"Page cap reached ({self.max_pages}); use --max-pages to increase")
         logger.info(f"Scan completed in {end_time - start_time:.2f} seconds")
         logger.info(f"Visited {len(self.visited_urls)} URLs")
         logger.info(f"Downloaded {len(self.code_files)} code files")
@@ -324,19 +438,28 @@ class WebScanner:
         Returns:
             list: List of new discovered URLs
         """
-        # Fix #5: atomic check-and-add prevents two threads processing the same URL
+        # Normalize first so /page and /page/ share the same visited_urls key.
+        url = self._normalize_url(url)
         with self._visited_lock:
             if url in self.visited_urls:
                 return []
             self.visited_urls.add(url)
         logger.info(f"Processing: {url} (depth: {depth})")
-        
+
         max_retries = 3
         retry_count = 0
-        
+
         while retry_count < max_retries:
             try:
                 response = self.session.get(url, timeout=self.timeout, allow_redirects=True)
+
+                # If the server redirected (e.g. /page → /page/), mark the final
+                # URL as visited too so we don't re-download it via another link.
+                if response.url:
+                    norm_final = self._normalize_url(response.url)
+                    if norm_final != url:
+                        with self._visited_lock:
+                            self.visited_urls.add(norm_final)
                 
                 # Check for API endpoints using centralized patterns
                 url_path = urlparse(url).path.lower()
@@ -933,6 +1056,9 @@ class WebScanner:
         Returns:
             bool: Whether the URL should be processed
         """
+        # Normalize before any check so /page and /page/ share the same key.
+        url = self._normalize_url(url)
+
         # Skip already visited URLs
         if url in self.visited_urls:
             return False
@@ -944,19 +1070,34 @@ class WebScanner:
         if parsed_url.scheme not in ['http', 'https']:
             return False
 
+        # Skip pure search-query URLs: same template, different results, not worth
+        # spending the page budget on (e.g. ?qt=piknik+rodzinny, ?q=foo, etc.).
+        if parsed_url.query:
+            qs_keys = set(parse_qs(parsed_url.query).keys())
+            if qs_keys and qs_keys.issubset(_SEARCH_PARAMS):
+                return False
+
         # For fully-qualified URLs, run the full path-safety check.
         # This catches garbage URLs (JS regex literals, HTTP header names, etc.)
         # that may have slipped through extraction paths that don't call is_valid_url.
         if parsed_url.netloc and not self.is_valid_url(url):
             return False
         
-        # Skip fragments within the same page
-        if not parsed_url.netloc and parsed_url.fragment:
+        # Skip fragment-only or fragment-bearing URLs — fragments are in-page anchors,
+        # not separate resources, and would trigger redundant duplicate requests.
+        if parsed_url.fragment:
             return False
         
-        # Check domain scope
-        if self.same_domain_only and parsed_url.netloc and parsed_url.netloc != self.base_domain:
+        # Always block known social networks, CDNs, and analytics domains —
+        # they would consume the entire page budget without recon value.
+        if parsed_url.netloc in _EXTERNAL_DENYLIST:
             return False
+
+        # Check domain scope: treat www.foo.com and foo.com as the same site.
+        if self.same_domain_only and parsed_url.netloc:
+            host_bare = parsed_url.netloc.removeprefix('www.')
+            if host_bare != self._base_domain_bare:
+                return False
         
         # Check file extensions
         path = parsed_url.path.lower()

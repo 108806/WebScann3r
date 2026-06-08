@@ -14,8 +14,14 @@ A web reconnaissance and static analysis tool for red team assessments. Crawls a
 ## Features
 
 ### Crawling & Discovery
-- **Recursive web crawler** with configurable depth and thread count
-- **Multi-domain scope control** — stay on target or follow external links
+- **Priority-based crawl queue** — shallow pages (fewer path segments) are visited before deep ones; pages referenced by many other pages are promoted above those linked only once, ensuring the most structurally important URLs are always processed first
+- **Page cap** — configurable maximum page count (default 2000, `--max-pages 0` for unlimited) stops runaway crawls on large CMS or e-commerce sites while guaranteeing full coverage of the navigation structure
+- **URL normalisation** — trailing slashes, `http`/`https` scheme variants, and redirect destinations are all canonicalised to the same key; a page is never downloaded twice regardless of how many different link forms point to it
+- **Fragment deduplication** — anchor-only URL variants (`/page#section`, `/page#nav`) are stripped to `/page` before queuing; the same HTTP request is never made twice for in-page anchors
+- **External domain denylist** — social networks, CDNs, and analytics domains (Facebook, Google Analytics, Twitter, LinkedIn, jsDelivr, Cloudflare, etc.) are never crawled even in `--all-domains` mode
+- **Search query filtering** — URLs whose entire query string consists of known text-search parameters (`?q=`, `?qt=`, `?search=`, etc.) are skipped; they return identical templates and waste the page budget
+- **`www` normalisation** — `www.example.com` and `example.com` are treated as the same host for scope enforcement
+- **Multi-domain scope control** — stay on target or follow external links with `--all-domains`
 - **User-Agent rotation** — picks a random current browser string (Chrome, Firefox, Safari, Edge across Windows/macOS/Linux) per scan so consecutive runs don't share an identical fingerprint
 - **Form extraction** — collects every HTML form (action, method, inputs) during crawl
 - **JavaScript redirect following** — detects and queues `window.location` redirects
@@ -27,6 +33,13 @@ A web reconnaissance and static analysis tool for red team assessments. Crawls a
   SQLi, XSS, Open Redirect, CSRF, RCE, File Inclusion, Path Traversal, XXE,
   GraphQL Injection, WebSocket Security, Business Logic Flaws, Prototype Pollution,
   Insecure Crypto, Hardcoded Credentials, SSRF, SSTI, Deserialization, and more
+- **Pre-compiled pattern engine** — all 400+ regexes are compiled once at startup and reused across every file; no per-file recompilation overhead
+- **File-type-aware analysis** — each file extension runs only the pattern categories that are realistically applicable:
+  - `.css` / `.scss` / `.less` — 10 categories (credentials, versions, SSRF via `url()`, path traversal, XSS injection, crypto)
+  - `.json` / `.yml` / `.yaml` — 18 categories (credentials, JWT secrets, CORS config, cookie flags, NoSQL, SSRF, versions, redirect URLs, crypto)
+  - `.xml` — 21 categories (JSON set + XXE, XML Injection, SQL Injection)
+  - `.js` / `.php` / `.html` / everything else — all 40 categories
+- **Analysis content cap** — files larger than 150 KB are truncated before regex matching; security-relevant patterns (credentials, sinks, version strings) are found in the first portion of any file; avoids catastrophic backtracking on large minified assets
 - **Dangerous sink detection** — identifies taint sinks (eval, exec, innerHTML, SQL queries, file ops, LDAP, JWT, etc.) with priority scoring for fuzzing
 - **False-positive reduction** — word boundaries, negative lookaheads, and quote requirements baked into every pattern to minimise noise
 - **Finding deduplication** — identical matches in minified bundles are reported once, not hundreds of times
@@ -116,6 +129,7 @@ options:
   -t, --text                  Download text files (txt, md, csv, json, xml)
   -j N, --threads N           Concurrent threads (default: 15)
   --timeout N                 Request timeout in seconds (default: 20)
+  --max-pages N               Maximum pages to crawl (default: 2000, 0 = unlimited)
   -v, --verbose               Enable verbose output
   -q, --quiet                 Suppress all output except errors
 ```
@@ -140,6 +154,12 @@ python webscann3r.py https://example.com -a
 
 # Follow external links, max depth 2
 python webscann3r.py https://example.com -a 2
+
+# Raise page cap for very large sites
+python webscann3r.py https://example.com --max-pages 5000
+
+# Disable page cap entirely
+python webscann3r.py https://example.com --max-pages 0
 ```
 
 ## Understanding the Reports

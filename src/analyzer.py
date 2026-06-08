@@ -54,6 +54,84 @@ with open(os.path.join(os.path.dirname(__file__), 'patterns', 'vuln_recommendati
 
 logger = logging.getLogger('WebScann3r.Analyzer')
 
+# ---------------------------------------------------------------------------
+# File-type category allowlists
+#
+# For extensions listed here, ONLY the named categories are run.
+# Extensions NOT in this dict (JS, PHP, HTML, unknown) get all 40 categories.
+#
+# Design rule: when in doubt, KEEP the category.  Only omit when there is no
+# realistic scenario — even in hacked/misconfigured files — where the pattern
+# could fire meaningfully for that file type.
+# ---------------------------------------------------------------------------
+
+# Patterns relevant to stylesheets.
+# Kept: credentials/tokens in comments, version info, URL-based issues (url()
+#   can reference internal IPs or traverse paths), XSS (hacked sites inject
+#   <script> tags or expression() into CSS), insecure crypto (base64 keys in
+#   CSS custom properties or comments).
+# Skipped: SQL/command/LDAP injection, deserialization, SSTI, JWT, WebSocket,
+#   CSRF, session fixation — none of these can execute from a stylesheet context.
+_CSS_CATEGORIES = frozenset({
+    'Hardcoded Credentials',
+    'Sensitive Data Exposure',
+    'Information Disclosure',
+    'Software/Library Versions',
+    'SSRF Vulnerabilities',
+    'Path Traversal',
+    'XSS',
+    'Insecure Crypto',
+    'Insecure Configuration',
+    'CVE/RCE Patterns',
+})
+
+# Patterns relevant to JSON/YAML/XML data files.
+# Kept: anything that can live in a config file — credentials, secrets, library
+#   versions, CORS/cookie config, JWT secrets, URLs (SSRF), file paths (traversal),
+#   MongoDB query patterns (NoSQL), crypto config, HTTP header config, insecure
+#   redirect URLs in config.
+#   XML additionally gets XXE and XML injection since those live in XML documents.
+# Skipped: XSS, command injection, SSTI, deserialization (Java/PHP-specific byte
+#   streams), LDAP, race conditions, clickjacking, prototype pollution, session
+#   fixation, reflected file download — none of these appear in data files.
+_JSON_CATEGORIES = frozenset({
+    'Hardcoded Credentials',
+    'Sensitive Data Exposure',
+    'Information Disclosure',
+    'Software/Library Versions',
+    'JWT Issues',
+    'Weak JWT Secret',
+    'Insecure Configuration',
+    'CORS Misconfiguration',
+    'Insecure Cookie Flags',
+    'CVE/RCE Patterns',
+    'Path Traversal',
+    'SSRF Vulnerabilities',
+    'NoSQL Injection',
+    'Insecure Crypto',
+    'Open Redirect',
+    'Insecure HTTP Headers',
+    'Insecure Randomness',
+    'Business Logic Flaw',
+})
+
+_XML_CATEGORIES = _JSON_CATEGORIES | frozenset({
+    'XXE Vulnerabilities',
+    'XML Injection',
+    'SQL Injection',       # SQL in XML (e.g. stored procedures in XSLT, or SQL-based XML)
+})
+
+# Map extensions to their allowlist.  None (missing key) = run all categories.
+_CATEGORY_ALLOWLIST: dict = {
+    '.css':  _CSS_CATEGORIES,
+    '.scss': _CSS_CATEGORIES,
+    '.less': _CSS_CATEGORIES,
+    '.json': _JSON_CATEGORIES,
+    '.yml':  _JSON_CATEGORIES,
+    '.yaml': _JSON_CATEGORIES,
+    '.xml':  _XML_CATEGORIES,
+}
+
 class SecurityAnalyzer:
     def __init__(self):
         """
@@ -200,6 +278,19 @@ class SecurityAnalyzer:
         # Use loaded JSON for descriptions and recommendations
         self.vulnerability_descriptions = VULN_DESCRIPTIONS
         self.mitigation_recommendations = VULN_RECOMMENDATIONS
+
+        # Pre-compile all patterns once so the regex engine doesn't recompile them
+        # on every file (400+ patterns across 40 categories would thrash the re cache).
+        self._compiled_patterns = {}
+        for issue_type, raw_patterns in self.security_patterns.items():
+            compiled = []
+            for p in raw_patterns:
+                try:
+                    compiled.append(re.compile(p, re.MULTILINE))
+                except re.error as e:
+                    logger.warning(f"Invalid regex in '{issue_type}': {p!r} — {e}")
+            self._compiled_patterns[issue_type] = compiled
+
     
     def analyze_code(self, code_files):
         """
@@ -222,19 +313,34 @@ class SecurityAnalyzer:
         print(f"\n[ANALYSIS] {total} file{'s' if total != 1 else ''}, {n_patterns} pattern categories")
         print(f"{'-' * 60}")
 
+        # Truncate large files before analysis: security-relevant content (credentials,
+        # injection sinks, version strings) always appears in the first portion of a
+        # file — the remaining kilobytes are usually minified filler that only causes
+        # catastrophic regex backtracking.
+        MAX_ANALYSIS_CHARS = 150_000  # 150 KB
+
         for file_idx, (file_path, content) in enumerate(code_files.items(), 1):
             file_name = os.path.basename(file_path)
             kb = len(content) / 1024
-            # Print filename immediately so the user sees activity even before slow files finish
-            print(f"  [{file_idx:>{idx_w}}/{total}]  {file_name:<38}  {kb:6.1f} KB  ", end="", flush=True)
+            truncated = len(content) > MAX_ANALYSIS_CHARS
+            content_slice = content[:MAX_ANALYSIS_CHARS] if truncated else content
+
+            file_ext = os.path.splitext(file_name)[1].lower()
+            # None means run all categories; a frozenset means only run those listed.
+            allowed_cats = _CATEGORY_ALLOWLIST.get(file_ext)
+
+            trunc_marker = '~' if truncated else ' '
+            print(f"  [{file_idx:>{idx_w}}/{total}]  {file_name:<38}  {kb:6.1f} KB{trunc_marker} ", end="", flush=True)
 
             file_findings = {}
             try:
-                for issue_type, patterns in self.security_patterns.items():
+                for issue_type, compiled_pats in self._compiled_patterns.items():
+                    if allowed_cats is not None and issue_type not in allowed_cats:
+                        continue
                     matches = []
-                    for pattern in patterns:
+                    for compiled_pat in compiled_pats:
                         try:
-                            for match in re.finditer(pattern, content):
+                            for match in compiled_pat.finditer(content_slice):
                                 line_number = content[:match.start()].count('\n') + 1
                                 code_lines = content.splitlines()
                                 start_line = max(0, line_number - 3)
@@ -256,9 +362,9 @@ class SecurityAnalyzer:
                                     version = match.group(1)
                                     detected_libraries[library_name] = version
                         except re.error as regex_err:
-                            logger.error(f"Regex error in pattern for {issue_type}: {pattern}\nError: {regex_err}")
+                            logger.error(f"Regex error in pattern for {issue_type}: {compiled_pat.pattern!r}\nError: {regex_err}")
                         except Exception as e:
-                            logger.error(f"Unexpected error in pattern for {issue_type}: {pattern}\nError: {e}")
+                            logger.error(f"Unexpected error in pattern for {issue_type}: {compiled_pat.pattern!r}\nError: {e}")
                     if matches:
                         file_findings[issue_type] = matches
             except Exception as file_exc:
